@@ -1,0 +1,38 @@
+# Docker ignore patterns
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test and coverage files
+coverage/
+*.test.js
+jest.config.js
+.eslintrc.js
+
+# Development files
+.env.local
+.env.development
+
+# Documentation
+docs/
+README.md
+*.md
+
+# Git files
+.git/
+.gitignore
+
+# IDE files
+.vscode/
+.idea/
+
+# CI/CD files
+.github/
+
+# Development dependencies in package.json are already excluded by multi-stage build
+
+# Helm charts (not needed in container)
+deploy/

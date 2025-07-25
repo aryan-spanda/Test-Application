@@ -1,0 +1,16 @@
+apiVersion: v2
+name: test-application
+description: A Helm chart for Test Application
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - spanda
+  - platform
+  - demo
+home: https://github.com/your-org/test-application
+sources:
+  - https://github.com/your-org/test-application
+maintainers:
+  - name: Platform Team
+    email: platform@yourorg.com
