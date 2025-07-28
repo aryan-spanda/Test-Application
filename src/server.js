@@ -55,9 +55,14 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/metrics', (req, res) => {
-  res.set('Content-Type', promClient.register.contentType);
-  res.end(promClient.register.metrics());
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', promClient.register.contentType);
+    const metrics = await promClient.register.metrics();
+    res.end(metrics);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve metrics' });
+  }
 });
 
 app.get('/api/users', (req, res) => {
@@ -79,8 +84,8 @@ app.get('/api/status', (req, res) => {
 });
 
 // Error handling
-app.use((err, req, res, next) => {
-  console.error(err.stack);
+app.use((err, req, res) => {
+  console.error(err.stack); // eslint-disable-line no-console
   res.status(500).json({
     error: 'Internal Server Error',
     message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message
@@ -95,12 +100,14 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Test Application running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`Metrics: http://localhost:${PORT}/metrics`);
-});
+// Start server only if this file is run directly
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Test Application running on port ${PORT}`); // eslint-disable-line no-console
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`); // eslint-disable-line no-console
+    console.log(`Health check: http://localhost:${PORT}/health`); // eslint-disable-line no-console
+    console.log(`Metrics: http://localhost:${PORT}/metrics`); // eslint-disable-line no-console
+  });
+}
 
 module.exports = app;
