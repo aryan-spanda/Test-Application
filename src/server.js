@@ -28,10 +28,15 @@ app.use(express.json());
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
-    const duration = (Date.now() - start) / 1000;
-    httpRequestDuration
-      .labels(req.method, req.route?.path || req.path, res.statusCode)
-      .observe(duration);
+    try {
+      const duration = (Date.now() - start) / 1000;
+      httpRequestDuration
+        .labels(req.method, req.route?.path || req.path, res.statusCode)
+        .observe(duration);
+    } catch (error) {
+      // Ignore metrics errors to prevent 500s
+      console.error('Metrics error:', error.message); // eslint-disable-line no-console
+    }
   });
   next();
 });
