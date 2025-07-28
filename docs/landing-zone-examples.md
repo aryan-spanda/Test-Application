@@ -17,7 +17,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/your-org/test-application.git
+    repoURL: https://github.com/aryan-spanda/Test-Application.git
     targetRevision: develop
     path: deploy/helm
     helm:
@@ -47,7 +47,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/your-org/test-application.git
+    repoURL: https://github.com/aryan-spanda/Test-Application.git
     targetRevision: main
     path: deploy/helm
     helm:
@@ -80,7 +80,7 @@ spec:
     description: "Sample test application for platform demo"
   
   source:
-    repository: https://github.com/your-org/test-application.git
+    repository: https://github.com/aryan-spanda/Test-Application.git
     path: deploy/helm
     
   environments:

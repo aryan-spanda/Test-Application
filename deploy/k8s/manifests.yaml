@@ -34,7 +34,7 @@ spec:
         fsGroup: 1001
       containers:
       - name: test-application
-        image: ghcr.io/your-org/test-application:latest
+        image: ghcr.io/aryan-spanda/test-application:latest
         imagePullPolicy: Always
         ports:
         - name: http
