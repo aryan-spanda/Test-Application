@@ -79,14 +79,19 @@ jobs:
         token: ${{ secrets.GITOPS_PAT }}
         ref: ${{ env.TARGET_BRANCH }}
 
-    - name: Update Kustomize image tag
+    - name: Update Helm values image tag
       run: |
         NEW_TAG="${{ needs.build-and-push.outputs.short-sha }}"
-        TARGET_FILE="apps/sample-app-prod/overlays/production/kustomization.yaml"
+        TARGET_FILE="apps/test-application/values-prod.yaml"
         
         if [ -f "$TARGET_FILE" ]; then
-          sed -i "s|newTag: .*|newTag: ${NEW_TAG}|g" "$TARGET_FILE"
-          echo "Updated $TARGET_FILE with tag: ${NEW_TAG}"
+          # Update the image repository to Docker Hub
+          sed -i "s|repository: .*|repository: ${{ env.IMAGE_NAME }}|g" "$TARGET_FILE"
+          # Update the image tag
+          sed -i "s|tag: .*|tag: \"${NEW_TAG}\"|g" "$TARGET_FILE"
+          echo "Updated $TARGET_FILE with:"
+          echo "  Repository: ${{ env.IMAGE_NAME }}"
+          echo "  Tag: ${NEW_TAG}"
         else
           echo "Error: $TARGET_FILE not found!"
           exit 1
@@ -106,7 +111,7 @@ jobs:
         
         NEW_TAG="${{ needs.build-and-push.outputs.short-sha }}"
         git add .
-        git commit -m "🚀 Update sample-app image to ${NEW_TAG}"
+        git commit -m "🚀 Update test-application image to ${{ env.IMAGE_NAME }}:${NEW_TAG}"
         git push origin ${{ env.TARGET_BRANCH }}
 
   security-scan:
