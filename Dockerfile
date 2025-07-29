@@ -25,6 +25,7 @@ COPY --from=builder /app/node_modules ./node_modules
 
 # Copy application code
 COPY --chown=nodeuser:nodejs src/ ./src/
+COPY --chown=nodeuser:nodejs frontend/ ./frontend/
 COPY --chown=nodeuser:nodejs package*.json ./
 
 # Expose port

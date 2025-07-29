@@ -28,7 +28,7 @@ describe('Test Application API', () => {
   });
 
   describe('GET /api/users', () => {
-    it('should return list of users', async () => {
+    it('should return list of users with enhanced data', async () => {
       const res = await request(app)
         .get('/api/users')
         .expect(200);
@@ -38,17 +38,64 @@ describe('Test Application API', () => {
       expect(res.body[0]).toHaveProperty('id');
       expect(res.body[0]).toHaveProperty('name');
       expect(res.body[0]).toHaveProperty('email');
+      expect(res.body[0]).toHaveProperty('role');
+      expect(res.body[0]).toHaveProperty('status');
+      expect(res.body[0]).toHaveProperty('lastLogin');
     });
   });
 
   describe('GET /api/status', () => {
-    it('should return application status', async () => {
+    it('should return comprehensive application status', async () => {
       const res = await request(app)
         .get('/api/status')
         .expect(200);
       
-      expect(res.body).toHaveProperty('application', 'test-application');
+      expect(res.body).toHaveProperty('application', 'spanda-ai-test-application');
       expect(res.body).toHaveProperty('status', 'running');
+      expect(res.body).toHaveProperty('database');
+      expect(res.body).toHaveProperty('services');
+      expect(res.body).toHaveProperty('network');
+      expect(res.body).toHaveProperty('cluster_info');
+    });
+  });
+
+  describe('GET /api/network/diagnostics', () => {
+    it('should return network diagnostic information', async () => {
+      const res = await request(app)
+        .get('/api/network/diagnostics')
+        .expect(200);
+      
+      expect(res.body).toHaveProperty('timestamp');
+      expect(res.body).toHaveProperty('tests');
+      expect(res.body).toHaveProperty('network_stats');
+      expect(Array.isArray(res.body.tests)).toBe(true);
+      expect(res.body.tests.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('GET /api/monitoring/metrics', () => {
+    it('should return monitoring metrics', async () => {
+      const res = await request(app)
+        .get('/api/monitoring/metrics')
+        .expect(200);
+      
+      expect(res.body).toHaveProperty('timestamp');
+      expect(res.body).toHaveProperty('system_metrics');
+      expect(res.body).toHaveProperty('application_metrics');
+      expect(res.body).toHaveProperty('ai_metrics');
+    });
+  });
+
+  describe('GET /api/database/stats', () => {
+    it('should return database statistics', async () => {
+      const res = await request(app)
+        .get('/api/database/stats')
+        .expect(200);
+      
+      expect(res.body).toHaveProperty('timestamp');
+      expect(res.body).toHaveProperty('connection_info');
+      expect(res.body).toHaveProperty('performance');
+      expect(res.body).toHaveProperty('storage');
     });
   });
 
