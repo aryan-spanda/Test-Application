@@ -69,10 +69,17 @@ jobs:
 
     - name: Update Kustomize image tag
       run: |
-        # This path might need adjustment if your folder structure is different
-        # in the config repo.
-        cd apps/sample-app-prod/overlays/production
-        sed -i 's/newTag: .*/newTag: ${{ github.sha }}/' kustomization.yaml
+        # Update the correct path for your config repo structure
+        # Your structure: apps/test-application/values-prod.yaml
+        if [ -f "apps/test-application/values-prod.yaml" ]; then
+          NEW_TAG="${{ github.sha }}"
+          sed -i "s|tag: \".*\"|tag: \"${NEW_TAG}\"|g" apps/test-application/values-prod.yaml
+          echo "Updated apps/test-application/values-prod.yaml with tag: ${NEW_TAG}"
+        else
+          echo "Warning: apps/test-application/values-prod.yaml not found"
+          echo "Available structure:"
+          find apps -name "*.yaml" -type f || echo "No yaml files found in apps directory"
+        fi
 
     - name: Commit and push changes
       run: |
