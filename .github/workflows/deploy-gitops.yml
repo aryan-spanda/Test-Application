@@ -113,6 +113,11 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+    # --- THIS STEP WAS ADDED ---
+    # The upload-sarif action needs access to the repository code.
+    - name: Checkout code
+      uses: actions/checkout@v4
+
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
