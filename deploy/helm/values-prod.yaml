@@ -2,7 +2,7 @@
 replicaCount: 3
 
 image:
-  tag: "{{ .Values.global.imageTag | default "latest" }}"
+  tag: "{{ .Values.global.imageTag | default \"latest\" }}"
 
 app:
   env:
