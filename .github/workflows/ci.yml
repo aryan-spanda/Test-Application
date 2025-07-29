@@ -2,13 +2,23 @@ name: Build and Deploy
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
+# Grant write permissions to the workflow for its own repo (for some actions)
+# And package permissions to push to the container registry
+permissions:
+  contents: write
+  packages: write
+
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # Using Docker Hub as discussed
+  REGISTRY: docker.io
+  # Your Docker Hub username/image name
+  IMAGE_NAME: aryanpola/sample-application
+  # The repository for your Kubernetes configuration
+  CONFIG_REPO_URL: https://github.com/aryan-spanda/Spanda-config # <-- IMPORTANT: CHANGE THIS to your actual config repo URL
 
 jobs:
   test:
@@ -26,70 +36,62 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Run linter
-      run: npm run lint
-
     - name: Run tests
       run: npm test
 
   build:
     needs: test
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Log in to Container Registry
+    - name: Log in to Docker Hub
       uses: docker/login-action@v3
       with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
         push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+        tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-  update-image-tag:
+  update-config-repo:
+    # This job is the core of your CD process
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    # Only run this job when pushing to the main branch
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-    - name: Checkout code
+    - name: Checkout Config Repo
+      # Check out the separate repository where your Kubernetes manifests are stored
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ github.repository_owner }}/config-repo # <-- IMPORTANT: CHANGE THIS to your config repo name
+        token: ${{ secrets.GITOPS_PAT }} # Use the Personal Access Token to get write access
 
-    - name: Update Helm values
+    - name: Update Kustomize image tag
       run: |
-        # Update the image tag in values-prod.yaml
-        sed -i 's/tag: ".*"/tag: "${{ github.sha }}"/' deploy/helm/values-prod.yaml
-        
-        # Commit and push changes
+        # This command finds the kustomization file for the sample app
+        # and updates the image tag to the new commit SHA
+        cd apps/sample-app-prod/overlays/production
+        sed -i 's/newTag: .*/newTag: ${{ github.sha }}/' kustomization.yaml
+
+    - name: Commit and push changes
+      run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add deploy/helm/values-prod.yaml
-        git commit -m "Update image tag to ${{ github.sha }}" || exit 0
-        git push
+        git add .
+        # Check if there are any changes to commit
+        if git diff-index --quiet HEAD; then
+          echo "No changes to commit."
+        else
+          git commit -m "Update image tag for sample-app to ${{ github.sha }}"
+          git push
+        fi
 
   security-scan:
     needs: build
@@ -98,7 +100,7 @@ jobs:
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
         format: 'sarif'
         output: 'trivy-results.sarif'
 
