@@ -79,23 +79,62 @@ jobs:
         token: ${{ secrets.GITOPS_PAT }}
         ref: ${{ env.TARGET_BRANCH }}
 
+    - name: Debug repository structure
+      run: |
+        echo "=== Repository root contents ==="
+        ls -la
+        echo ""
+        echo "=== Apps directory contents ==="
+        if [ -d "apps" ]; then
+          ls -la apps/
+          echo ""
+          echo "=== Apps subdirectories ==="
+          find apps/ -type d
+          echo ""
+          echo "=== All YAML files in apps ==="
+          find apps/ -name "*.yaml" -o -name "*.yml"
+        else
+          echo "apps directory not found!"
+        fi
+
     - name: Update Helm values image tag
       run: |
         NEW_TAG="${{ needs.build-and-push.outputs.short-sha }}"
-        TARGET_FILE="apps/test-application/values-prod.yaml"
         
-        if [ -f "$TARGET_FILE" ]; then
-          # Update the image repository to Docker Hub
-          sed -i "s|repository: .*|repository: ${{ env.IMAGE_NAME }}|g" "$TARGET_FILE"
-          # Update the image tag
-          sed -i "s|tag: .*|tag: \"${NEW_TAG}\"|g" "$TARGET_FILE"
-          echo "Updated $TARGET_FILE with:"
-          echo "  Repository: ${{ env.IMAGE_NAME }}"
-          echo "  Tag: ${NEW_TAG}"
-        else
-          echo "Error: $TARGET_FILE not found!"
+        # Try multiple possible file locations
+        POSSIBLE_FILES=(
+          "apps/test-application/values-prod.yaml"
+          "apps/spandaai-backend/values-prod.yaml"
+          "apps/spandaai-frontend/values-prod.yaml"
+          "config-repo/apps/test-application/values-prod.yaml"
+          "Test-Application/values-prod.yaml"
+        )
+        
+        TARGET_FILE=""
+        for file in "${POSSIBLE_FILES[@]}"; do
+          if [ -f "$file" ]; then
+            TARGET_FILE="$file"
+            echo "Found target file: $TARGET_FILE"
+            break
+          fi
+        done
+        
+        if [ -z "$TARGET_FILE" ]; then
+          echo "Error: No suitable values file found!"
+          echo "Searched for:"
+          for file in "${POSSIBLE_FILES[@]}"; do
+            echo "  - $file"
+          done
           exit 1
         fi
+        
+        # Update the image repository to Docker Hub
+        sed -i "s|repository: .*|repository: ${{ env.IMAGE_NAME }}|g" "$TARGET_FILE"
+        # Update the image tag
+        sed -i "s|tag: .*|tag: \"${NEW_TAG}\"|g" "$TARGET_FILE"
+        echo "Updated $TARGET_FILE with:"
+        echo "  Repository: ${{ env.IMAGE_NAME }}"
+        echo "  Tag: ${NEW_TAG}"
         
         git diff
 
