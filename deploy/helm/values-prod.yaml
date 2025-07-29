@@ -2,7 +2,9 @@
 replicaCount: 3
 
 image:
-  tag: "v2"
+  repository: ghcr.io/aryan-spanda/test-application
+  tag: "latest"
+  pullPolicy: Always
 
 app:
   name: test-application
