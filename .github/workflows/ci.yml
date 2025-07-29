@@ -6,19 +6,15 @@ on:
   pull_request:
     branches: [ main ]
 
-# Grant write permissions to the workflow for its own repo (for some actions)
-# And package permissions to push to the container registry
 permissions:
   contents: write
   packages: write
 
 env:
-  # Using Docker Hub as discussed
   REGISTRY: docker.io
-  # Your Docker Hub username/image name
   IMAGE_NAME: aryanpola/sample-application
-  # The repository for your Kubernetes configuration
-  CONFIG_REPO_URL: https://github.com/aryan-spanda/Spanda-config # <-- IMPORTANT: CHANGE THIS to your actual config repo URL
+  # Corrected the repository name here for consistency
+  CONFIG_REPO_URL: https://github.com/aryan-spanda/Spanda-config
 
 jobs:
   test:
@@ -60,23 +56,21 @@ jobs:
         tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
 
   update-config-repo:
-    # This job is the core of your CD process
     needs: build
     runs-on: ubuntu-latest
-    # Only run this job when pushing to the main branch
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
     - name: Checkout Config Repo
-      # Check out the separate repository where your Kubernetes manifests are stored
       uses: actions/checkout@v4
       with:
-        repository: ${{ github.repository_owner }}/config-repo # <-- IMPORTANT: CHANGE THIS to your config repo name
-        token: ${{ secrets.GITOPS_PAT }} # Use the Personal Access Token to get write access
+        # --- THIS IS THE CORRECTED LINE ---
+        repository: aryan-spanda/Spanda-config-repo
+        token: ${{ secrets.GITOPS_PAT }}
 
     - name: Update Kustomize image tag
       run: |
-        # This command finds the kustomization file for the sample app
-        # and updates the image tag to the new commit SHA
+        # This path might need adjustment if your folder structure is different
+        # in the config repo.
         cd apps/sample-app-prod/overlays/production
         sed -i 's/newTag: .*/newTag: ${{ github.sha }}/' kustomization.yaml
 
@@ -85,7 +79,6 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add .
-        # Check if there are any changes to commit
         if git diff-index --quiet HEAD; then
           echo "No changes to commit."
         else
