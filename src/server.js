@@ -27,7 +27,28 @@ app.use(cors());
 app.use(morgan('combined'));
 app.use(express.json());
 
-// Serve static frontend files
+// Routes - Define specific routes BEFORE static middleware
+// Serve the main dashboard at root
+app.get('/', (req, res) => {
+  // Check if the 'Accept' header *specifically* contains 'application/json'.
+  // This is more precise than req.accepts().
+  const acceptsJson = req.get('Accept')?.includes('application/json');
+
+  if (acceptsJson) {
+    // If the client explicitly asks for JSON, send it.
+    res.json({
+      message: 'Welcome to Test Application',
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } else {
+    // For all other cases (including a normal browser request), send the HTML file.
+    res.sendFile(path.join(__dirname, '../frontend/index.html'));
+  }
+});
+
+// Serve static frontend files AFTER specific routes
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 // Metrics middleware
@@ -47,23 +68,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
-// Serve the main dashboard at root
-app.get('/', (req, res) => {
-  // Check if this is an API request
-  if (req.headers.accept && req.headers.accept.includes('application/json')) {
-    res.json({
-      message: 'Welcome to Test Application',
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development'
-    });
-  } else {
-    // Serve the HTML dashboard
-    res.sendFile(path.join(__dirname, '../frontend/index.html'));
-  }
-});
-
+// API Routes
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',

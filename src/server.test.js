@@ -3,15 +3,25 @@ const app = require('../src/server');
 
 describe('Test Application API', () => {
   describe('GET /', () => {
-    it('should return welcome message', async () => {
+    it('should return welcome message for JSON requests', async () => {
       const res = await request(app)
         .get('/')
+        .set('Accept', 'application/json')
         .expect(200);
       
       expect(res.body).toHaveProperty('message');
       expect(res.body.message).toBe('Welcome to Test Application');
       expect(res.body).toHaveProperty('version');
       expect(res.body).toHaveProperty('timestamp');
+    });
+
+    it('should return HTML for browser requests', async () => {
+      const res = await request(app)
+        .get('/')
+        .expect(200);
+      
+      expect(res.text).toContain('<!DOCTYPE html>');
+      expect(res.headers['content-type']).toMatch(/text\/html/);
     });
   });
 
