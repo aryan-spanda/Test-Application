@@ -8,7 +8,7 @@ on:
       - 'docs/**'
       - '.github/**'
 
-# Add permissions for GitHub Actions
+# Add permissions for GitHub Actions.
 permissions:
   contents: read
   packages: write
