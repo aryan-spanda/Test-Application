@@ -64,7 +64,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         # --- THIS IS THE CORRECTED LINE ---
-        repository: aryan-spanda/Spanda-config-repo
+        repository: aryan-spanda/Spanda-config
         token: ${{ secrets.GITOPS_PAT }}
 
     - name: Update Kustomize image tag
