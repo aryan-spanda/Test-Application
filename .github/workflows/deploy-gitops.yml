@@ -10,6 +10,8 @@ on:
 permissions:
   contents: write
   packages: write
+  # Add security-events permission for uploading SARIF results
+  security-events: write
 
 env:
   # Using Docker Hub as established
@@ -90,7 +92,6 @@ jobs:
           exit 1
         fi
         
-        # Show what changed
         git diff
 
     - name: Commit and push changes
@@ -108,10 +109,28 @@ jobs:
         git commit -m "🚀 Update sample-app image to ${NEW_TAG}"
         git push origin ${{ env.TARGET_BRANCH }}
 
+  security-scan:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.short-sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        # This optimization makes the scan much faster
+        scanners: 'vuln'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
+
   notify-deployment:
     needs: [build-and-push, update-gitops-config]
     runs-on: ubuntu-latest
-    if: always() # This job runs even if previous jobs fail, to report status
+    if: always()
     steps:
     - name: Deployment notification
       run: |
