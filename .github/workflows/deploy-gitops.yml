@@ -17,7 +17,7 @@ env:
   # Using Docker Hub as established
   REGISTRY: docker.io
   IMAGE_NAME: aryanpola/sample-application
-  # Your configuration repository
+  # Your configuration repository - this should match your actual GitHub repo name
   CONFIG_REPO: aryan-spanda/Spanda-config
   TARGET_BRANCH: main
 
@@ -197,6 +197,104 @@ jobs:
         # Show application status
         kubectl get application test-application-staging -n argocd -o wide
 
+  deploy-platform-modules:
+    needs: [build-and-push, update-gitops-config]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout application repository
+      uses: actions/checkout@v4
+      
+    - name: Checkout platform repository
+      uses: actions/checkout@v4
+      with:
+        repository: spandaai/spandaai-platform-terraform-deployment
+        token: ${{ secrets.GITOPS_PAT }}
+        path: platform
+        
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.0.0
+        
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+
+    - name: Configure kubectl
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+        chmod 600 ~/.kube/config
+
+    - name: Parse platform module configuration
+      run: |
+        # Check if platform-modules.yaml exists
+        if [ ! -f "platform-modules.yaml" ]; then
+          echo "No platform-modules.yaml found - skipping platform module deployment"
+          exit 0
+        fi
+        
+        echo "Platform modules configuration found. Parsing enabled modules..."
+        
+        # Extract enabled modules using yq (install if not available)
+        if ! command -v yq &> /dev/null; then
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+        fi
+        
+        # Get enabled modules
+        ENABLED_MODULES=$(yq eval '.data | to_entries | .[] | select(.value == "enabled") | .key' platform-modules.yaml)
+        echo "Enabled modules: $ENABLED_MODULES"
+        
+        # Export for next steps
+        echo "ENABLED_MODULES<<EOF" >> $GITHUB_ENV
+        echo "$ENABLED_MODULES" >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
+        
+    - name: Deploy platform modules with Terraform
+      run: |
+        if [ -z "$ENABLED_MODULES" ]; then
+          echo "No enabled modules found - skipping deployment"
+          exit 0
+        fi
+        
+        cd .platform/terraform
+        
+        # Initialize Terraform
+        terraform init
+        
+        # Set variables for deployment
+        export TF_VAR_image_tag="${{ needs.build-and-push.outputs.short-sha }}"
+        export TF_VAR_app_name="test-application"
+        export TF_VAR_namespace="test-application-staging"
+        export TF_VAR_image_name="${{ env.IMAGE_NAME }}"
+        
+        # Plan the deployment
+        terraform plan -out=tfplan
+        
+        # Apply the platform modules
+        terraform apply -auto-approve tfplan
+        
+        # Show outputs
+        terraform output
+        
+    - name: Verify platform module deployment
+      run: |
+        echo "Verifying platform module deployment..."
+        
+        # Check if namespace was created
+        kubectl get namespace test-application-staging || echo "Namespace not found"
+        
+        # Check for load balancer services
+        kubectl get services -n test-application-staging || echo "No services found"
+        
+        # Check for any new resources created by platform modules
+        kubectl get all -n test-application-staging || echo "No resources found"
+        
+        # Display events for troubleshooting
+        kubectl get events -n test-application-staging --sort-by='.lastTimestamp' || echo "No events found"
+
   security-scan:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -221,21 +319,23 @@ jobs:
         sarif_file: 'trivy-results.sarif'
 
   notify-deployment:
-    needs: [build-and-push, update-gitops-config, deploy-to-argocd]
+    needs: [build-and-push, update-gitops-config, deploy-to-argocd, deploy-platform-modules]
     runs-on: ubuntu-latest
     if: always()
     steps:
     - name: Deployment notification
       run: |
-        if [ "${{ needs.update-gitops-config.result }}" == "success" ] && [ "${{ needs.deploy-to-argocd.result }}" == "success" ]; then
-          echo "✅ Successfully completed full GitOps deployment!"
+        if [ "${{ needs.update-gitops-config.result }}" == "success" ] && [ "${{ needs.deploy-to-argocd.result }}" == "success" ] && [ "${{ needs.deploy-platform-modules.result }}" == "success" ]; then
+          echo "✅ Successfully completed full GitOps deployment with platform modules!"
           echo "🐳 Image: ${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.short-sha }}"
           echo "📦 GitOps config updated in repository"
           echo "🚀 ArgoCD application deployed and syncing"
+          echo "🏗️ Platform modules deployed successfully"
           echo "🌐 Check your application at your ingress URL"
         else
           echo "❌ Deployment failed. Check logs for details:"
           echo "  - GitOps Config: ${{ needs.update-gitops-config.result }}"
           echo "  - ArgoCD Deploy: ${{ needs.deploy-to-argocd.result }}"
+          echo "  - Platform Modules: ${{ needs.deploy-platform-modules.result }}"
           exit 1
         fi
