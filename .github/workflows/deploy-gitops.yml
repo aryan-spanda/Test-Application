@@ -2,7 +2,7 @@ name: Build and Deploy with GitOps
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, cicd ]
     paths-ignore:
       - 'README.md'
       - 'docs/**'
@@ -19,7 +19,7 @@ env:
   IMAGE_NAME: aryanpola/sample-application
   # Your configuration repository - this should match your actual GitHub repo name
   CONFIG_REPO: aryan-spanda/Spanda-config
-  TARGET_BRANCH: main
+  TARGET_BRANCH: ${{ github.ref_name == 'cicd' && 'cicd' || 'main' }}
 
 jobs:
   test:
