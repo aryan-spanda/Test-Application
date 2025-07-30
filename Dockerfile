@@ -1,4 +1,6 @@
 # Multi-stage build for Node.js application
+
+# Build stage
 FROM node:18-alpine AS builder
 
 # Set working directory
@@ -10,40 +12,41 @@ COPY package*.json ./
 # Install dependencies (use npm install if no lock file exists)
 RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm cache clean --force
 
-# Production stage
-FROM node:18-alpine
+# Copy source code
+COPY src/ ./src/
 
-# Create non-root user
+# Production stage
+FROM node:18-alpine AS production
+
+# Create app user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodeuser -u 1001
 
 # Set working directory
 WORKDIR /app
 
-# Copy node_modules from builder stage
+# Copy dependencies from builder stage
 COPY --from=builder /app/node_modules ./node_modules
 
-# Copy application code
+# Copy source code with correct ownership
 COPY --chown=nodeuser:nodejs src/ ./src/
-COPY --chown=nodeuser:nodejs frontend/ ./frontend/
 COPY --chown=nodeuser:nodejs package*.json ./
 
-# Expose port
-EXPOSE 3000
+# Create .env file if .env.example exists
+COPY --chown=nodeuser:nodejs .env.example ./.env 2>/dev/null || true
+
+# Upgrade packages for security
+RUN apk upgrade --no-cache
 
 # Switch to non-root user
 USER nodeuser
 
+# Expose port
+EXPOSE 3000
+
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "const http = require('http'); \
-    const options = { hostname: 'localhost', port: 3000, path: '/health', method: 'GET' }; \
-    const req = http.request(options, (res) => { \
-      if (res.statusCode === 200) { console.log('Health check passed'); process.exit(0); } \
-      else { console.log('Health check failed'); process.exit(1); } \
-    }); \
-    req.on('error', () => { console.log('Health check failed'); process.exit(1); }); \
-    req.end();"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
 
 # Start the application
-CMD ["npm", "start"]
+CMD ["node", "src/index.js"]
