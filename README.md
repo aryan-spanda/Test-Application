@@ -2,7 +2,22 @@
 
 A comprehensive full-stack application for testing Spanda AI platform capabilities including networking, monitoring, and GitOps deployment workflows.
 
-## 🌟 Features
+## � Spanda Platform Ready
+
+This application is configured for deployment on **Spanda Platform** with automatic infrastructure provisioning, monitoring, and GitOps deployment.
+
+### Platform Files
+- `platform-values.yaml` - Platform deployment configuration
+- `platform-modules.yaml` - Required platform services
+- `setup-spanda-platform.sh` - Quick setup script
+
+### Quick Platform Setup
+```bash
+# Run the setup script to configure for Spanda Platform
+./setup-spanda-platform.sh
+```
+
+## �🌟 Features
 
 ### Frontend Dashboard
 - **Beautiful UI**: Modern, responsive web interface with gradient design

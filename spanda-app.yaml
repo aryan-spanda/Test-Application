@@ -1,0 +1,55 @@
+# Spanda Platform Application Configuration
+# Simple configuration file for app developers
+
+app:
+  name: "test-application"
+  team: "development"
+  description: "Sample test application for Spanda platform"
+  repository: "aryanpola/sample-application"  # Docker image repository
+  config_repo: "aryan-spanda/Spanda-config"   # Platform config repository
+
+# Services your application provides
+services:
+  - name: "backend"
+    port: 8080
+    protocol: "HTTP"
+    path: "/api"
+    healthCheck: "/health"
+    dockerfile: "./backend/Dockerfile"
+    context: "./backend"
+  - name: "frontend"
+    port: 80
+    protocol: "HTTP"
+    path: "/"
+    healthCheck: "/health"
+    dockerfile: "./frontend/Dockerfile"
+    context: "./frontend"
+
+# Environment configurations
+environments:
+  staging:
+    replicas: 2
+    resources:
+      cpu: "100m"
+      memory: "128Mi"
+    ingress:
+      enabled: true
+      domain: "staging.example.com"
+    
+  production:
+    replicas: 5
+    resources:
+      cpu: "500m" 
+      memory: "512Mi"
+    ingress:
+      enabled: true
+      domain: "prod.example.com"
+
+# Platform modules to enable (simplified selection)
+platform:
+  networking: true      # Load balancer, ingress, network policies
+  monitoring: true      # Prometheus, Grafana, alerts
+  security: true        # RBAC, pod security, network policies
+  storage: false        # Persistent volumes, backup
+  logging: true         # Centralized logging
+  autoscaling: false    # Horizontal pod autoscaler
