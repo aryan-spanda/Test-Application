@@ -103,6 +103,7 @@ jobs:
         
         # Try multiple possible file locations
         POSSIBLE_FILES=(
+          "apps/test-application/values-staging.yaml"
           "apps/test-application/values-prod.yaml"
           "apps/spandaai-backend/values-prod.yaml"
           "apps/spandaai-frontend/values-prod.yaml"
