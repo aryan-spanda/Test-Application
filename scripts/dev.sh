@@ -33,19 +33,19 @@ check_docker() {
 
 # Install dependencies
 install_deps() {
-    log_info "Installing dependencies..."
-    npm install
+    log_info "Installing dependencies for all workspaces..."
+    npm run install:all
 }
 
 # Run tests
 run_tests() {
-    log_info "Running tests..."
+    log_info "Running tests for all workspaces..."
     npm test
 }
 
 # Run linter
 run_lint() {
-    log_info "Running linter..."
+    log_info "Running linter for all workspaces..."
     npm run lint
 }
 
@@ -65,46 +65,32 @@ run_container() {
 
 # Run application locally (no Docker)
 run_local() {
-    log_info "Starting application locally..."
-    npm start
+    log_info "Starting backend only..."
+    cd src/backend && npm start
 }
 
-# Run in development mode with nodemon
+# Run in development mode with hot reload
 run_dev() {
-    log_info "Starting application in development mode..."
+    log_info "Starting both frontend and backend in development mode..."
     npm run dev
 }
 
-# Validate Helm chart
-validate_helm() {
-    log_info "Validating Helm chart..."
-    if ! command -v helm &> /dev/null; then
-        log_error "Helm is not installed. Please install Helm first."
-        exit 1
-    fi
-    
-    helm lint deploy/helm/
-    helm template test-app deploy/helm/ --values deploy/helm/values-dev.yaml
+# Run frontend only
+run_frontend() {
+    log_info "Starting frontend only..."
+    npm run dev:frontend
 }
 
-# Deploy to local Kubernetes (kind/minikube)
-deploy_local_k8s() {
-    log_info "Deploying to local Kubernetes..."
-    if ! command -v kubectl &> /dev/null; then
-        log_error "kubectl is not installed. Please install kubectl first."
-        exit 1
-    fi
-    
-    # Create namespace
-    kubectl create namespace test-app-local --dry-run=client -o yaml | kubectl apply -f -
-    
-    # Deploy using Helm
-    helm upgrade --install test-app deploy/helm/ \
-        --namespace test-app-local \
-        --values deploy/helm/values-dev.yaml \
-        --set image.repository=test-application \
-        --set image.tag=local \
-        --set ingress.enabled=false
+# Run backend only
+run_backend() {
+    log_info "Starting backend only..."
+    npm run dev:backend
+}
+
+# Build applications
+build_apps() {
+    log_info "Building both frontend and backend..."
+    npm run build
 }
 
 # Health check
@@ -124,23 +110,28 @@ show_help() {
     echo "Usage: $0 [command]"
     echo ""
     echo "Commands:"
-    echo "  install          Install npm dependencies"
-    echo "  test             Run tests"
-    echo "  lint             Run linter"
+    echo "  install          Install dependencies for all workspaces"
+    echo "  test             Run tests for frontend and backend"
+    echo "  lint             Run linter for frontend and backend"
+    echo "  build-apps       Build frontend and backend applications"
     echo "  build            Build Docker image"
-    echo "  run              Run application locally (no Docker)"
-    echo "  dev              Run in development mode with nodemon"
-    echo "  container        Run Docker container locally"
-    echo "  validate-helm    Validate Helm chart"
-    echo "  deploy-local     Deploy to local Kubernetes"
+    echo "  run              Run backend only (production mode)"
+    echo "  dev              Run both frontend and backend (development mode)"
+    echo "  frontend         Run frontend only (development mode)"
+    echo "  backend          Run backend only (development mode)"
+    echo "  container        Build and run Docker container locally"
     echo "  health           Perform health check"
     echo "  help             Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0 install       # Install dependencies"
-    echo "  $0 dev           # Start development server"
+    echo "  $0 install       # Install all dependencies"
+    echo "  $0 dev           # Start both frontend and backend"
+    echo "  $0 frontend      # Start frontend only"
+    echo "  $0 backend       # Start backend only"
     echo "  $0 build         # Build Docker image"
     echo "  $0 container     # Run in Docker"
+    echo ""
+    echo "Note: For deployment, use the config repository's Helm charts"
 }
 
 # Main script logic
@@ -154,6 +145,9 @@ case "${1:-help}" in
     lint)
         run_lint
         ;;
+    build-apps)
+        build_apps
+        ;;
     build)
         build_image
         ;;
@@ -163,16 +157,15 @@ case "${1:-help}" in
     dev)
         run_dev
         ;;
+    frontend)
+        run_frontend
+        ;;
+    backend)
+        run_backend
+        ;;
     container)
         build_image
         run_container
-        ;;
-    validate-helm)
-        validate_helm
-        ;;
-    deploy-local)
-        build_image
-        deploy_local_k8s
         ;;
     health)
         health_check

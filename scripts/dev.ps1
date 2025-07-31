@@ -34,19 +34,19 @@ function Test-Docker {
 
 # Install dependencies
 function Install-Dependencies {
-    Write-Info "Installing dependencies..."
-    npm install
+    Write-Info "Installing dependencies for all workspaces..."
+    npm run install:all
 }
 
 # Run tests
 function Invoke-Tests {
-    Write-Info "Running tests..."
+    Write-Info "Running tests for all workspaces..."
     npm test
 }
 
 # Run linter
 function Invoke-Lint {
-    Write-Info "Running linter..."
+    Write-Info "Running linter for all workspaces..."
     npm run lint
 }
 
@@ -66,38 +66,35 @@ function Start-Container {
 
 # Run application locally (no Docker)
 function Start-Local {
-    Write-Info "Starting application locally..."
+    Write-Info "Starting backend only..."
+    Set-Location src/backend
     npm start
+    Set-Location ../..
 }
 
-# Run in development mode with nodemon
+# Run in development mode with hot reload
 function Start-Dev {
-    Write-Info "Starting application in development mode..."
+    Write-Info "Starting both frontend and backend in development mode..."
     npm run dev
 }
 
-# Validate Helm chart
-function Test-Helm {
-    Write-Info "Validating Helm chart..."
-    if (!(Get-Command helm -ErrorAction SilentlyContinue)) {
-        Write-Error "Helm is not installed. Please install Helm first."
-        exit 1
-    }
-    
-    helm lint deploy/helm/
-    helm template test-app deploy/helm/ --values deploy/helm/values-dev.yaml
+# Run frontend only
+function Start-Frontend {
+    Write-Info "Starting frontend only..."
+    npm run dev:frontend
 }
 
-# Deploy to local Kubernetes
-function Deploy-LocalK8s {
-    Write-Info "Deploying to local Kubernetes..."
-    if (!(Get-Command kubectl -ErrorAction SilentlyContinue)) {
-        Write-Error "kubectl is not installed. Please install kubectl first."
-        exit 1
-    }
-    
-    # Create namespace
-    kubectl create namespace test-app-local --dry-run=client -o yaml | kubectl apply -f -
+# Run backend only
+function Start-Backend {
+    Write-Info "Starting backend only..."
+    npm run dev:backend
+}
+
+# Build applications
+function Build-Apps {
+    Write-Info "Building both frontend and backend..."
+    npm run build
+}
     
     # Deploy using Helm
     helm upgrade --install test-app deploy/helm/ `
@@ -129,23 +126,28 @@ function Show-Help {
     Write-Host "Usage: .\scripts\dev.ps1 [command]" -ForegroundColor White
     Write-Host ""
     Write-Host "Commands:" -ForegroundColor White
-    Write-Host "  install          Install npm dependencies"
-    Write-Host "  test             Run tests"
-    Write-Host "  lint             Run linter"
+    Write-Host "  install          Install dependencies for all workspaces"
+    Write-Host "  test             Run tests for frontend and backend"
+    Write-Host "  lint             Run linter for frontend and backend"
+    Write-Host "  build-apps       Build frontend and backend applications"
     Write-Host "  build            Build Docker image"
-    Write-Host "  run              Run application locally (no Docker)"
-    Write-Host "  dev              Run in development mode with nodemon"
-    Write-Host "  container        Run Docker container locally"
-    Write-Host "  validate-helm    Validate Helm chart"
-    Write-Host "  deploy-local     Deploy to local Kubernetes"
+    Write-Host "  run              Run backend only (production mode)"
+    Write-Host "  dev              Run both frontend and backend (development mode)"
+    Write-Host "  frontend         Run frontend only (development mode)"
+    Write-Host "  backend          Run backend only (development mode)"
+    Write-Host "  container        Build and run Docker container locally"
     Write-Host "  health           Perform health check"
     Write-Host "  help             Show this help message"
     Write-Host ""
     Write-Host "Examples:" -ForegroundColor White
-    Write-Host "  .\scripts\dev.ps1 install       # Install dependencies"
-    Write-Host "  .\scripts\dev.ps1 dev           # Start development server"
+    Write-Host "  .\scripts\dev.ps1 install       # Install all dependencies"
+    Write-Host "  .\scripts\dev.ps1 dev           # Start both frontend and backend"
+    Write-Host "  .\scripts\dev.ps1 frontend      # Start frontend only"
+    Write-Host "  .\scripts\dev.ps1 backend       # Start backend only"
     Write-Host "  .\scripts\dev.ps1 build         # Build Docker image"
     Write-Host "  .\scripts\dev.ps1 container     # Run in Docker"
+    Write-Host ""
+    Write-Host "Note: For deployment, use the config repository's Helm charts" -ForegroundColor Yellow
 }
 
 # Main script logic
@@ -159,6 +161,9 @@ switch ($Command.ToLower()) {
     "lint" {
         Invoke-Lint
     }
+    "build-apps" {
+        Build-Apps
+    }
     "build" {
         Build-Image
     }
@@ -168,16 +173,15 @@ switch ($Command.ToLower()) {
     "dev" {
         Start-Dev
     }
+    "frontend" {
+        Start-Frontend
+    }
+    "backend" {
+        Start-Backend
+    }
     "container" {
         Build-Image
         Start-Container
-    }
-    "validate-helm" {
-        Test-Helm
-    }
-    "deploy-local" {
-        Build-Image
-        Deploy-LocalK8s
     }
     "health" {
         Test-Health

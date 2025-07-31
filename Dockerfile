@@ -1,17 +1,24 @@
-# Multi-stage build for Node.js application
-FROM node:18-alpine AS builder
+# Multi-stage build for frontend and backend
 
-# Set working directory
-WORKDIR /app
+# Stage 1: Build Frontend
+FROM node:18-alpine AS frontend-builder
+WORKDIR /app/frontend
+COPY src/frontend/package*.json ./
+RUN npm ci --only=production
+COPY src/frontend/ ./
+COPY src/shared/ ../shared/
+RUN npm run build
 
-# Copy package files
-COPY package*.json ./
+# Stage 2: Build Backend
+FROM node:18-alpine AS backend-builder
+WORKDIR /app/backend
+COPY src/backend/package*.json ./
+RUN npm ci --only=production
+COPY src/backend/ ./
+COPY src/shared/ ../shared/
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
-
-# Production stage
-FROM node:18-alpine
+# Stage 3: Production Runtime
+FROM node:18-alpine AS production
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -20,13 +27,16 @@ RUN addgroup -g 1001 -S nodejs && \
 # Set working directory
 WORKDIR /app
 
-# Copy node_modules from builder stage
-COPY --from=builder /app/node_modules ./node_modules
+# Copy backend
+COPY --from=backend-builder --chown=nodeuser:nodejs /app/backend ./backend/
+COPY --from=backend-builder --chown=nodeuser:nodejs /app/shared ./shared/
 
-# Copy application code
-COPY --chown=nodeuser:nodejs src/ ./src/
-COPY --chown=nodeuser:nodejs frontend/ ./frontend/
-COPY --chown=nodeuser:nodejs package*.json ./
+# Copy frontend build
+COPY --from=frontend-builder --chown=nodeuser:nodejs /app/frontend/build ./frontend/build/
+
+# Install production dependencies for backend
+WORKDIR /app/backend
+RUN npm ci --only=production && npm cache clean --force
 
 # Expose port
 EXPOSE 3000
