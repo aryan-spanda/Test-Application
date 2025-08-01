@@ -2,28 +2,34 @@
 replicaCount: 1
 
 image:
-  tag: "dev"
+  tag: "latest"
+  pullPolicy: Always
 
 ingress:
-  hosts:
-    - host: test-app-dev.spanda.local
-      paths:
-        - path: /
-          pathType: Prefix
+  enabled: true
+  className: "nginx"
+  host: "test-app-dev.spanda.local"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
   tls:
     - secretName: test-app-dev-tls
       hosts:
         - test-app-dev.spanda.local
 
-app:
-  env:
-    NODE_ENV: development
-    LOG_LEVEL: debug
+env:
+  NODE_ENV: development
+  LOG_LEVEL: debug
 
 resources:
   limits:
-    cpu: 200m
+    cpu: 250m
     memory: 256Mi
   requests:
     cpu: 50m
     memory: 64Mi
+
+probes:
+  liveness:
+    initialDelaySeconds: 10
+  readiness:
+    initialDelaySeconds: 3

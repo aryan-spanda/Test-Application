@@ -1,10 +1,10 @@
-# Default values for test-application
+# Base values - environment agnostic defaults
 replicaCount: 2
 
 image:
   repository: ghcr.io/aryan-spanda/test-application
-  pullPolicy: Always
   tag: "latest"
+  pullPolicy: IfNotPresent
 
 imagePullSecrets: []
 nameOverride: ""
@@ -36,25 +36,18 @@ service:
   port: 80
   targetPort: 3000
 
+# Ingress disabled by default - enabled per environment
 ingress:
-  enabled: true
-  className: "nginx"
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-  hosts:
-    - host: test-app.spanda.local
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: test-app-tls
-      hosts:
-        - test-app.spanda.local
+  enabled: false
+  className: ""
+  host: ""
+  annotations: {}
+  tls: []
 
 resources:
   limits:
-    cpu: 500m
-    memory: 512Mi
+    cpu: 200m
+    memory: 256Mi
   requests:
     cpu: 100m
     memory: 128Mi
@@ -64,35 +57,31 @@ autoscaling:
   minReplicas: 2
   maxReplicas: 10
   targetCPUUtilizationPercentage: 80
-  targetMemoryUtilizationPercentage: 80
 
 nodeSelector: {}
-
 tolerations: []
-
 affinity: {}
 
-# Application specific configuration
+# Application configuration
 app:
   name: test-application
   version: "1.0.0"
   port: 3000
-  
-  env:
-    NODE_ENV: production
-    LOG_LEVEL: info
 
-  # Health check configuration
-  healthCheck:
+# Environment variables - populated by overlays
+env:
+  LOG_LEVEL: info
+
+# Health check configuration
+probes:
+  liveness:
     enabled: true
     path: /health
     initialDelaySeconds: 30
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
-
-  # Readiness probe configuration
-  readinessProbe:
+  readiness:
     enabled: true
     path: /health
     initialDelaySeconds: 5
@@ -100,8 +89,8 @@ app:
     timeoutSeconds: 3
     failureThreshold: 3
 
-  # Monitoring
-  metrics:
-    enabled: true
-    path: /metrics
-    port: 3000
+# Monitoring
+metrics:
+  enabled: true
+  path: /metrics
+  port: 3000

@@ -2,49 +2,29 @@
 replicaCount: 3
 
 image:
-  repository: ghcr.io/aryan-spanda/test-application
-  tag: "latest"
-  pullPolicy: Always
+  tag: "v1.0.0"  # Updated by CI/CD
 
-app:
-  name: test-application
-  version: "1.0.0"
-  port: 3000
-  
-  env:
-    NODE_ENV: production
-    LOG_LEVEL: info
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "test-app.spanda.local"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  tls:
+    - secretName: test-app-tls
+      hosts:
+        - test-app.spanda.local
 
-  # Health check configuration
-  healthCheck:
-    enabled: true
-    path: /health
-    initialDelaySeconds: 30
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
-
-  # Readiness probe configuration
-  readinessProbe:
-    enabled: true
-    path: /health
-    initialDelaySeconds: 5
-    periodSeconds: 5
-    timeoutSeconds: 3
-    failureThreshold: 3
-
-  # Monitoring
-  metrics:
-    enabled: true
-    path: /metrics
-    port: 3000
+env:
+  NODE_ENV: production
+  LOG_LEVEL: warn
 
 resources:
   limits:
     cpu: 1000m
     memory: 1Gi
   requests:
-    cpu: 200m
+    cpu: 250m
     memory: 256Mi
 
 autoscaling:
@@ -52,7 +32,7 @@ autoscaling:
   minReplicas: 3
   maxReplicas: 10
   targetCPUUtilizationPercentage: 70
-  targetMemoryUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
 
 affinity:
   podAntiAffinity:
