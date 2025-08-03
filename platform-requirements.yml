@@ -1,66 +1,56 @@
-# Platform Module Requirements
-# This file specifies which bare-metal platform modules your application needs
-# Developers can modify this file to enable/disable platform features
+# =====================================================================
+# Platform Requirements for CI/CD Onboarding and Infrastructure
+# =====================================================================
+# This file declares the application's infrastructure needs, target
+# environments, and Helm chart location. It is used by the automated
+# onboarding script to generate ArgoCD deployment manifests.
+# =====================================================================
 
-# Application Information
+# Section 1: Application Identity
+# ---------------------------------------------------------------------
 app:
   name: "test-application"
-  environment: "staging"  # staging, production
-  
-# Frontend Requirements
-frontend:
-  enabled: true
-  framework: "react"
-  
-  # Networking modules needed for frontend
+  repoURL: "https://github.com/aryan-spanda/Test-Application.git"
+  chartPath: "deploy/helm"
+
+# Section 2: Target Environments
+# ---------------------------------------------------------------------
+environments:
+  - dev
+  - staging
+  - production
+
+# Section 3: Platform Module Requirements
+# ---------------------------------------------------------------------
+platform:
   modules:
+    # --- Networking Modules ---
+    vpc_networking: true              # Virtual private cloud (Required)
     external_load_balancer: true      # Public internet access
-    ssl_termination: true             # HTTPS support
-    cdn: false                        # Content delivery network
-    waf: false                        # Web application firewall
-    
-  # Frontend-specific configuration
-  config:
-    replicas: 2
-    port: 3000
-    domain: "app.example.com"         # Optional: custom domain
-
-# Backend Requirements  
-backend:
-  enabled: true
-  framework: "express"
-  database: "none"                    # none, postgresql, mongodb, redis
-  
-  # Networking modules needed for backend
-  modules:
     internal_load_balancer: true      # Internal service communication
-    external_api_access: true         # External API endpoints
-    service_mesh: false               # Advanced networking
-    monitoring: true                  # Observability stack
-    
-  # Backend-specific configuration
-  config:
-    replicas: 2
-    port: 5000
-    health_check: "/health"
-    api_prefix: "/api/v1"
+    firewall: true                    # Security rules and network policies
+    ssl_termination: true             # HTTPS support
 
-# Shared Infrastructure Modules
-shared:
-  # Core platform modules (rarely changed)
-  modules:
-    vpc_networking: true              # Virtual private cloud
-    firewall: true                    # Security rules
+    # --- Observability Modules ---
     logging: true                     # Centralized logging
-    metrics: true                     # Application metrics
+    monitoring: true                  # Observability stack (Prometheus/Grafana)
+    metrics: true                     # Application metrics scraping
+
+    # --- Core Services ---
     secrets_management: true          # Secret store integration
-    
-  # Optional shared services
-  optional:
+
+    # --- Optional Modules (Disabled for Test App) ---
+    cdn: false                        # Content Delivery Network
+    waf: false                        # Web Application Firewall
+    service_mesh: false               # Advanced networking (Istio)
     backup: false                     # Automated backups
-    disaster_recovery: false          # Multi-region setup
-    compliance_scanning: false        # Security compliance
-    cost_optimization: false          # Resource optimization
+    disaster_recovery: false          # Multi-region failover
+
+# =====================================================================
+# NOTE: Application runtime configuration (replicas, image tags, CPU,
+# memory, environment variables, etc.) is managed in the Helm chart's
+# values files at deploy/helm/, NOT here.
+# =====================================================================
 
 # =====================================================================
 # ENVIRONMENT RESOURCE ALLOCATION (PLATFORM MANAGED - DO NOT EDIT)
