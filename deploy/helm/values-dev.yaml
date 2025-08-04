@@ -2,7 +2,7 @@
 replicaCount: 1
 
 image:
-  tag: "5582ed4d"
+  tag: "9ffd0b91"
   pullPolicy: Always
 
 ingress:
