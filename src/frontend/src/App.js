@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import Users from './pages/Users';
 import About from './pages/About';
 
+// Testing ArgoCD Image Updater integration - Aug 4, 2025
 const AppContainer = styled.div`
   min-height: 100vh;
   background-color: #f8f9fa;
