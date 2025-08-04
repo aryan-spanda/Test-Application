@@ -2,7 +2,7 @@
 replicaCount: 3
 
 image:
-  tag: "v1.0.0"  # Updated by CI/CD
+  tag: "latest"  # Static tag - actual deployment tags managed in config repo
 
 ingress:
   enabled: true
