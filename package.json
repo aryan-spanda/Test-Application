@@ -1,6 +1,6 @@
 {
   "name": "test-application",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Test application with frontend and backend",
   "private": true,
   "workspaces": [

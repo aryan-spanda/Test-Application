@@ -9,6 +9,24 @@ const Container = styled.div`
   padding: 2rem;
 `;
 
+const TestBanner = styled.div`
+  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  color: white;
+  text-align: center;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  font-weight: bold;
+  font-size: 1.2rem;
+  animation: pulse 2s infinite;
+  
+  @keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+  }
+`;
+
 const HeroSection = styled.section`
   text-align: center;
   padding: 4rem 0;
@@ -142,13 +160,20 @@ const Home = () => {
 
   return (
     <Container>
+      <TestBanner>
+        🔥 TESTING ARGOCD IMAGE UPDATER - Frontend Updated at {new Date().toLocaleString()} 🔥
+      </TestBanner>
+      
       <HeroSection>
-        <HeroTitle>Welcome to Dummy App</HeroTitle>
+        <HeroTitle>🚀 Welcome to Spanda Test App 🚀</HeroTitle>
         <HeroSubtitle>
-          A full-stack application built for the Spanda Platform
+          A full-stack application built for the Spanda Platform - Testing ArgoCD Image Updater!
         </HeroSubtitle>
         <div style={{ marginTop: '2rem' }}>
           <strong>Powered by React + Node.js + Kubernetes</strong>
+        </div>
+        <div style={{ marginTop: '1rem', fontSize: '1rem', opacity: '0.8' }}>
+          🔥 Updated: {new Date().toLocaleString()} - Testing GitOps Automation 🔥
         </div>
       </HeroSection>
 
