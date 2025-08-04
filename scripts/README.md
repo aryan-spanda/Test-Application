@@ -21,6 +21,7 @@ Both scripts provide the same functionality with platform-specific implementatio
 .\scripts\dev.ps1 [command]
 ```
 
+
 ## Available Commands
 
 | Command | Description |
