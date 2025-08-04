@@ -3,14 +3,20 @@
 # Stage 1: Build Frontend
 FROM node:18-alpine AS frontend-builder
 WORKDIR /app
-# Copy workspace root files first
+
+# Copy all package.json files first for dependency caching
 COPY package*.json ./
 COPY src/frontend/package*.json ./src/frontend/
-# Install all workspace dependencies from root
+COPY src/backend/package*.json ./src/backend/
+
+# Install root dependencies
 RUN npm ci
-# Copy frontend source
+
+# --- FIX IS HERE ---
+# COPY the frontend source code BEFORE running the build
 COPY src/frontend/ ./src/frontend/
 COPY src/shared/ ./src/shared/
+
 # Build frontend
 WORKDIR /app/src/frontend
 RUN npm run build
@@ -18,47 +24,46 @@ RUN npm run build
 # Stage 2: Build Backend
 FROM node:18-alpine AS backend-builder
 WORKDIR /app
-# Copy workspace root files
+
+# Copy all package.json files first
 COPY package*.json ./
+COPY src/frontend/package*.json ./src/frontend/
 COPY src/backend/package*.json ./src/backend/
-# Install all workspace dependencies from root
+
+# Install root dependencies
 RUN npm ci
-# Copy backend source
+
+# Copy backend and shared source code
 COPY src/backend/ ./src/backend/
 COPY src/shared/ ./src/shared/
 
-# Stage 3: Production Runtime
+# Stage 3: Final Production Image
 FROM node:18-alpine AS production
 
-# Create non-root user
+# Create a non-root user and group for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodeuser -u 1001
 
-# Set working directory
 WORKDIR /app
 
-# Copy backend
+# Copy dependencies from backend-builder
+COPY --from=backend-builder --chown=nodeuser:nodejs /app/node_modules ./node_modules
+
+# Copy built frontend from frontend-builder
+COPY --from=frontend-builder --chown=nodeuser:nodejs /app/src/frontend/build ./frontend/build
+
+# Copy backend and shared source code
 COPY --from=backend-builder --chown=nodeuser:nodejs /app/src/backend ./backend/
 COPY --from=backend-builder --chown=nodeuser:nodejs /app/src/shared ./shared/
+COPY --chown=nodeuser:nodejs package.json .
 
-# Copy frontend build
-COPY --from=frontend-builder --chown=nodeuser:nodejs /app/src/frontend/build ./frontend/build/
-
-# Copy workspace package files for production install
-COPY --from=backend-builder /app/package*.json ./
-COPY --from=backend-builder /app/src/backend/package*.json ./backend/
-
-# Install only production dependencies
-RUN npm ci --only=production
-
-# Expose port
-EXPOSE 3000
-
-# Switch to non-root user
+# Set the user to the non-root user
 USER nodeuser
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+EXPOSE 3000
+
+# Add a health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "const http = require('http'); \
     const options = { hostname: 'localhost', port: 3000, path: '/health', method: 'GET' }; \
     const req = http.request(options, (res) => { \
@@ -68,6 +73,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     req.on('error', () => { console.log('Health check failed'); process.exit(1); }); \
     req.end();"
 
-# Start the application
-WORKDIR /app/backend
-CMD ["node", "server.js"]
+CMD ["node", "backend/server.js"]
