@@ -21,7 +21,7 @@ The CI/CD pipeline automatically builds and pushes container images when code is
 # - ghcr.io/your-org/test-application:main-<sha> (commit SHA)
 ```
 
-### 2. Create Landing Zone Registration
+### 2. Create Landing Zone Registration for apps
 
 Create a registration file in the platform's landing zone repository:
 
