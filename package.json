@@ -1,7 +1,7 @@
 {
   "name": "test-application",
-  "version": "1.0.1",
-  "description": "Test application with frontend and backend",
+  "version": "1.0.2",
+  "description": "Test application with frontend and backend - Testing ArgoCD Image Updater",
   "private": true,
   "workspaces": [
     "src/frontend",

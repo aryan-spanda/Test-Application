@@ -22,6 +22,7 @@ const Logo = styled.h1`
   margin: 0;
   font-size: 1.5rem;
   font-weight: bold;
+  /* Updated for ArgoCD Image Updater testing - Aug 4, 2025 */
 `;
 
 const NavLinks = styled.ul`
