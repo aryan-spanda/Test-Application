@@ -1,0 +1,64 @@
+# =====================================================================
+# Platform Test Configuration
+# =====================================================================
+# This file is maintained by the APPLICATION DEVELOPER
+# It tells the platform CI/CD pipeline how to run tests for this app
+# =====================================================================
+
+app:
+  name: "test-application"
+  type: "fullstack"  # Options: frontend, backend, fullstack, static, api
+
+# Test Commands (Provided by App Developer)
+# ---------------------------------------------------------
+tests:
+  # Frontend Tests
+  frontend:
+    enabled: true
+    working_directory: "src/frontend"
+    setup_commands:
+      - "npm ci"
+    test_command: "npm test -- --coverage --watchAll=false"
+    coverage_threshold: 80
+    
+  # Backend Tests  
+  backend:
+    enabled: true
+    working_directory: "src/backend"
+    setup_commands:
+      - "pip install -r requirements.txt"
+      - "pip install pytest pytest-cov"
+    test_command: "pytest --cov=. --cov-report=xml --cov-fail-under=75"
+    coverage_threshold: 75
+    
+  # Integration Tests (Optional)
+  integration:
+    enabled: false
+    test_command: "docker-compose -f docker-compose.test.yml up --abort-on-container-exit"
+    
+  # Linting (Optional)
+  linting:
+    enabled: true
+    commands:
+      - "cd src/frontend && npm run lint"
+      - "cd src/backend && flake8 . || echo 'No Python linting configured'"
+
+# Build Configuration (Used by Platform)
+# ---------------------------------------------------------
+build:
+  dockerfile_path: "./Dockerfile"
+  context: "."
+  
+# Quality Gates (Enforced by Platform)
+# ---------------------------------------------------------
+quality_gates:
+  tests_required: true          # Platform will fail build if tests fail
+  coverage_required: true       # Platform will fail if coverage below threshold
+  linting_required: false       # Platform can optionally enforce linting
+
+# =====================================================================
+# PLATFORM CONTRACT:
+# - App developers maintain this file
+# - Platform CI/CD reads this file and executes the specified commands
+# - Platform enforces quality gates based on this configuration
+# =====================================================================
