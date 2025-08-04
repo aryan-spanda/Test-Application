@@ -5,7 +5,7 @@ name: Build and Deploy Test Application
 
 on:
   push:
-    branches: [main, develop, cicd]
+    branches: [main, develop, cicd, testing]
     paths-ignore:
       - 'README.md'
       - 'docs/**'
