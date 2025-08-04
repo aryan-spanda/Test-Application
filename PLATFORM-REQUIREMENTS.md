@@ -26,6 +26,7 @@ frontend:
     ssl_termination: true             # ✅ Enable HTTPS
     cdn: false                        # ❌ Disable CDN (expensive)
     
+    
 # Backend Requirements  
 backend:
   enabled: true
