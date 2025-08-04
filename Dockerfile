@@ -53,7 +53,6 @@ WORKDIR /app
 
 # Copy only the necessary production dependencies from the backend-builder
 COPY --from=backend-builder --chown=nodeuser:nodejs /app/node_modules ./node_modules
-COPY --from=backend-builder --chown=nodeuser:nodejs /app/src/backend/node_modules ./backend/node_modules
 
 # Copy the built static assets from the frontend-builder
 COPY --from=frontend-builder --chown=nodeuser:nodejs /app/src/frontend/build ./frontend/build
