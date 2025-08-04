@@ -1,28 +1,28 @@
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import '@testing-library/jest-dom';
-import App from '../App';
+import App from './App';
 
 // Mock the components to avoid router issues
-jest.mock('../components/Header', () => {
+jest.mock('./components/Header', () => {
   return function Header() {
     return <div>Header Mock</div>;
   };
 });
 
-jest.mock('../pages/Home', () => {
+jest.mock('./pages/Home', () => {
   return function Home() {
     return <div>Home Mock</div>;
   };
 });
 
-jest.mock('../pages/Users', () => {
+jest.mock('./pages/Users', () => {
   return function Users() {
     return <div>Users Mock</div>;
   };
 });
 
-jest.mock('../pages/About', () => {
+jest.mock('./pages/About', () => {
   return function About() {
     return <div>About Mock</div>;
   };
