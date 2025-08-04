@@ -19,6 +19,7 @@ const TestBanner = styled.div`
   font-weight: bold;
   font-size: 1.2rem;
   animation: pulse 2s infinite;
+  /* Updated for ArgoCD Image Updater configurable registry testing - Aug 4, 2025 */
   
   @keyframes pulse {
     0% { opacity: 1; }
