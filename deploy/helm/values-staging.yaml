@@ -2,7 +2,8 @@
 replicaCount: 2
 
 image:
-  tag: "latest"
+  # tag: managed by ArgoCD Image Updater via Helm parameters
+  pullPolicy: Always
 
 ingress:
   enabled: true

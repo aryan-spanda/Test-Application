@@ -3,7 +3,7 @@ replicaCount: 2
 
 image:
   repository: ghcr.io/aryan-spanda/test-application
-  tag: "latest"
+  # tag: managed by ArgoCD Image Updater via Helm parameters
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []

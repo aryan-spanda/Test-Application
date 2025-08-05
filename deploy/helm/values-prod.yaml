@@ -2,7 +2,8 @@
 replicaCount: 3
 
 image:
-  tag: "latest"  # Static tag - actual deployment tags managed in config repo
+  # tag: managed by ArgoCD Image Updater via Helm parameters
+  pullPolicy: Always
 
 ingress:
   enabled: true
