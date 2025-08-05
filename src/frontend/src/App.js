@@ -6,7 +6,7 @@ import Home from './pages/Home';
 import Users from './pages/Users';
 import About from './pages/About';
 
-// Testing Docker Hub integration with reusable platform workflow - Aug 5, 2025
+// Testing Docker Hub integration with GitOps automation - Aug 5, 2025 ✨
 const AppContainer = styled.div`
   min-height: 100vh;
   background-color: #f8f9fa;
