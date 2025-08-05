@@ -7,11 +7,21 @@
 # =====================================================================
 
 # Section 1: Application Identity
+# NEED TO SPECIFY A PRODUCTION/DEVELOPMENT BRANCH HERE
 # ---------------------------------------------------------------------
 app:
   name: "test-application"
   repoURL: "https://github.com/aryan-spanda/Test-Application.git"
   chartPath: "deploy/helm"
+  type: "fullstack"
+  team: "development-team"
+  
+# Section 1.1: Container Registry Configuration
+# ---------------------------------------------------------------------
+container:
+  registry: "ghcr.io"
+  organization: "aryan-spanda"
+  image: "test-application"
 
 # Section 2: Target Environments
 # ---------------------------------------------------------------------
@@ -19,6 +29,13 @@ environments:
   - dev
   - staging
   - production
+
+# Section 2.1: GitOps Configuration
+# ---------------------------------------------------------------------
+gitops:
+  targetBranch: "testing"
+  tagPattern: "^testing-[0-9a-f]{7,8}$"
+  updateStrategy: "newest-build"
 
 # Section 3: Platform Module Requirements
 # ---------------------------------------------------------------------
@@ -36,9 +53,11 @@ platform:
     monitoring: true                  # Observability stack (Prometheus/Grafana)
     metrics: true                     # Application metrics scraping
 
+    # TODO
     # --- Core Services ---
     secrets_management: true          # Secret store integration
 
+    # TODO
     # --- Optional Modules (Disabled for Test App) ---
     cdn: false                        # Content Delivery Network
     waf: false                        # Web Application Firewall
