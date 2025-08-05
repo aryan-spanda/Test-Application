@@ -162,7 +162,7 @@ const Home = () => {
   return (
     <Container>
       <TestBanner>
-        🎉 IT WORKS! ArgoCD GitOps triggered at {new Date().toLocaleString()} 🎉
+        � TESTING COMPLETE GITOPS PIPELINE - Updated at {new Date().toLocaleString()} �
       </TestBanner>
       
       <HeroSection>
