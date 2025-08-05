@@ -13,15 +13,6 @@ app:
   name: "test-application"
   repoURL: "https://github.com/aryan-spanda/Test-Application.git"
   chartPath: "deploy/helm"
-  type: "fullstack"
-  team: "development-team"
-  
-# Section 1.1: Container Registry Configuration
-# ---------------------------------------------------------------------
-container:
-  registry: "ghcr.io"
-  organization: "aryan-spanda"
-  image: "test-application"
 
 # Section 2: Target Environments
 # ---------------------------------------------------------------------
@@ -36,6 +27,13 @@ gitops:
   targetBranch: "testing"
   tagPattern: "^testing-[0-9a-f]{7,8}$"
   updateStrategy: "newest-build"
+
+# Section 2.2: Container Configuration
+# ---------------------------------------------------------------------
+container:
+  registry: "docker.io"
+  organization: "aryanpola"
+  image: "sample-application"
 
 # Section 3: Platform Module Requirements
 # ---------------------------------------------------------------------

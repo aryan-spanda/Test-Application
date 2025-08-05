@@ -1,6 +1,4 @@
-# Application Repository CI/CD Workflow - No Automatic Helm Generation
-# This workflow manages Helm values manually and calls platform CI/CD for building
-
+# Application CI/CD - Calls Platform Reusable Workflow
 name: Build and Deploy Test Application
 
 on:
@@ -20,165 +18,31 @@ permissions:
   security-events: write
 
 jobs:
-  # ===================================================================
-  # PHASE 1: READ APP DEVELOPER'S TEST CONFIGURATION
-  # ===================================================================
-  read-test-config:
-    name: Read Platform Test Configuration
-    runs-on: ubuntu-latest
-    outputs:
-      frontend-enabled: ${{ steps.config.outputs.frontend-enabled }}
-      backend-enabled: ${{ steps.config.outputs.backend-enabled }}
-      frontend-working-dir: ${{ steps.config.outputs.frontend-working-dir }}
-      backend-working-dir: ${{ steps.config.outputs.backend-working-dir }}
-      frontend-setup-commands: ${{ steps.config.outputs.frontend-setup-commands }}
-      backend-setup-commands: ${{ steps.config.outputs.backend-setup-commands }}
-      frontend-test-command: ${{ steps.config.outputs.frontend-test-command }}
-      backend-test-command: ${{ steps.config.outputs.backend-test-command }}
-      app-name: ${{ steps.config.outputs.app-name }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        
-      - name: Parse Platform Test Configuration
-        id: config
-        run: |
-          # Install yq for YAML parsing
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-          
-          # Platform Contract: App developers MUST provide application-test.yml
-          if [ ! -f "application-test.yml" ]; then
-            echo "❌ ERROR: application-test.yml not found!"
-            echo "Application developers must provide this file to specify their tests."
-            exit 1
-          fi
-          
-          # Read configuration provided by app developer
-          echo "frontend-enabled=$(yq '.tests.frontend.enabled' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "backend-enabled=$(yq '.tests.backend.enabled' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "frontend-working-dir=$(yq '.tests.frontend.working_directory' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "backend-working-dir=$(yq '.tests.backend.working_directory' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "frontend-setup-commands=$(yq '.tests.frontend.setup_commands | join(" && ")' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "backend-setup-commands=$(yq '.tests.backend.setup_commands | join(" && ")' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "frontend-test-command=$(yq '.tests.frontend.test_command' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "backend-test-command=$(yq '.tests.backend.test_command' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "app-name=$(yq '.app.name' application-test.yml)" >> $GITHUB_OUTPUT
-          
-          echo "✅ Platform test configuration loaded from app developer:"
-          cat application-test.yml
-
-  # ===================================================================
-  # PHASE 2: EXECUTE APP DEVELOPER'S TESTS (Technology Agnostic)
-  # ===================================================================
-  test-frontend:
-    name: Frontend Tests (App Developer Specified)
-    runs-on: ubuntu-latest
-    needs: read-test-config
-    if: needs.read-test-config.outputs.frontend-enabled == 'true'
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        
-      # Platform doesn't care about technology - just runs what app dev specified
-      - name: Run App Developer's Frontend Setup Commands
-        run: |
-          cd ${{ needs.read-test-config.outputs.frontend-working-dir }}
-          ${{ needs.read-test-config.outputs.frontend-setup-commands }}
-          
-      - name: Run App Developer's Frontend Tests
-        run: |
-          cd ${{ needs.read-test-config.outputs.frontend-working-dir }}
-          ${{ needs.read-test-config.outputs.frontend-test-command }}
-        env:
-          CI: true
-
-  test-backend:
-    name: Backend Tests (App Developer Specified)
-    runs-on: ubuntu-latest
-    needs: read-test-config
-    if: needs.read-test-config.outputs.backend-enabled == 'true'
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        
-      # Platform doesn't care about technology - just runs what app dev specified
-      - name: Run App Developer's Backend Setup Commands
-        run: |
-          cd ${{ needs.read-test-config.outputs.backend-working-dir }}
-          ${{ needs.read-test-config.outputs.backend-setup-commands }}
-          
-      - name: Run App Developer's Backend Tests
-        run: |
-          cd ${{ needs.read-test-config.outputs.backend-working-dir }}
-          ${{ needs.read-test-config.outputs.backend-test-command }}
-
-  # ===================================================================
-  # PHASE 3: BUILD CONTAINER (Platform Responsibility)
-  # ===================================================================
-  build-and-push:
-    name: Build and Push Container
-    runs-on: ubuntu-latest
-    needs: [read-test-config, test-frontend, test-backend]
-    # Platform Rule: Only build if ALL enabled tests pass
-    if: always() && (needs.test-frontend.result == 'success' || needs.test-frontend.result == 'skipped') && (needs.test-backend.result == 'success' || needs.test-backend.result == 'skipped') && github.event_name == 'push'
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Login to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  # ===================================================================
-  # PHASE 3: VALIDATE HELM CHARTS (Platform Quality Gate)
-  # ===================================================================
-  validate-helm:
-    name: Validate Helm Charts
-    runs-on: ubuntu-latest
-    needs: [build-and-push]  # Run after successful build
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Set up Helm
-      uses: azure/setup-helm@v3
-      with:
-        version: '3.12.0'
-
-    - name: Validate Helm charts
-      run: |
-        helm lint deploy/helm/
-        
-        # Template the charts to check for syntax errors  
-        helm template test-app deploy/helm/ --values deploy/helm/values-dev.yaml > /dev/null || echo "⚠️  values-dev.yaml not found"
-        helm template test-app deploy/helm/ --values deploy/helm/values-staging.yaml > /dev/null || echo "⚠️  values-staging.yaml not found"
-        helm template test-app deploy/helm/ --values deploy/helm/values-production.yaml > /dev/null || echo "⚠️  values-production.yaml not found"
-        
-        echo "✅ Helm chart validation completed"
+  call-platform-workflow:
+    name: Platform CI/CD
+    uses: aryan-spanda/config-repo/.github/workflows/reusable-platform-ci-cd.yml@main
+    with:
+      # Application Configuration (optional - will be read from platform-requirements.yml)
+      app_name: "Test-Application"
+      
+      # Test Configuration Files
+      test_config: "application-test.yml"
+      platform_requirements: "platform-requirements.yml"
+      
+      # Helm Chart Paths (customize if different from defaults)
+      chart_path: "deploy/helm"
+      values_dev: "deploy/helm/values-dev.yaml"
+      values_staging: "deploy/helm/values-staging.yaml"
+      values_prod: "deploy/helm/values-production.yaml"
+      
+      # Docker Configuration (optional - will be read from platform-requirements.yml)
+      dockerfile_path: "./Dockerfile"
+      docker_context: "."
+      
+      # GitOps Configuration
+      config_repo: "aryan-spanda/config-repo"
+      target_branch: "main"
+      
+      # Build Configuration
+      node_version: "18"
+    secrets: inherit
