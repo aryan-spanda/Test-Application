@@ -131,8 +131,8 @@ The application includes advanced network testing capabilities:
 ### Manual Deployment
 ```bash
 # Build and push image
-docker build -t ghcr.io/aryan-spanda/test-application:latest .
-docker push ghcr.io/aryan-spanda/test-application:latest
+docker build -t aryanpola/sample-application:latest .
+docker push aryanpola/sample-application:latest
 
 # Deploy to Kubernetes
 kubectl apply -f deploy/

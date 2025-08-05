@@ -19,9 +19,9 @@ app:
 # Section 1.1: Container Registry Configuration
 # ---------------------------------------------------------------------
 container:
-  registry: "ghcr.io"
-  organization: "aryan-spanda"
-  image: "test-application"
+  registry: "docker.io"
+  organization: "aryanpola"
+  image: "sample-application"
 
 # Section 2: Target Environments
 # ---------------------------------------------------------------------

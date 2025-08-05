@@ -16,9 +16,9 @@ The CI/CD pipeline automatically builds and pushes container images when code is
 
 ```bash
 # The pipeline builds images with these tags:
-# - ghcr.io/your-org/test-application:latest (main branch)
-# - ghcr.io/your-org/test-application:develop (develop branch)
-# - ghcr.io/your-org/test-application:main-<sha> (commit SHA)
+# - aryanpola/sample-application:latest (main branch)
+# - aryanpola/sample-application:develop (develop branch)
+# - aryanpola/sample-application:main-<sha> (commit SHA)
 ```
 
 ### 2. Create Landing Zone Registration for apps
@@ -152,7 +152,7 @@ Platform monitoring will automatically scrape metrics and monitor health.
 
 1. Verify image exists:
    ```bash
-   docker pull ghcr.io/your-org/test-application:latest
+   docker pull aryanpola/sample-application:latest
    ```
 
 2. Check image pull secrets in namespace

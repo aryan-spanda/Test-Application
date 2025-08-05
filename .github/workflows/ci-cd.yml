@@ -36,6 +36,10 @@ jobs:
       frontend-test-command: ${{ steps.config.outputs.frontend-test-command }}
       backend-test-command: ${{ steps.config.outputs.backend-test-command }}
       app-name: ${{ steps.config.outputs.app-name }}
+      container-registry: ${{ steps.config.outputs.container-registry }}
+      container-org: ${{ steps.config.outputs.container-org }}
+      container-image: ${{ steps.config.outputs.container-image }}
+      full-image-name: ${{ steps.config.outputs.full-image-name }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -64,6 +68,52 @@ jobs:
           echo "frontend-test-command=$(yq '.tests.frontend.test_command' application-test.yml)" >> $GITHUB_OUTPUT
           echo "backend-test-command=$(yq '.tests.backend.test_command' application-test.yml)" >> $GITHUB_OUTPUT
           echo "app-name=$(yq '.app.name' application-test.yml)" >> $GITHUB_OUTPUT
+          
+          # Extract container configuration from platform-requirements.yml
+          if [ -f "platform-requirements.yml" ]; then
+            REGISTRY=$(yq '.container.registry // "docker.io"' platform-requirements.yml)
+            ORG=$(yq '.container.organization // "aryanpola"' platform-requirements.yml)
+            IMAGE=$(yq '.container.image // "sample-application"' platform-requirements.yml)
+            
+            echo "container-registry=$REGISTRY" >> $GITHUB_OUTPUT
+            echo "container-org=$ORG" >> $GITHUB_OUTPUT
+            echo "container-image=$IMAGE" >> $GITHUB_OUTPUT
+            
+            if [ "$REGISTRY" = "docker.io" ]; then
+              echo "full-image-name=$ORG/$IMAGE" >> $GITHUB_OUTPUT
+            else
+              echo "full-image-name=$REGISTRY/$ORG/$IMAGE" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "container-registry=docker.io" >> $GITHUB_OUTPUT
+            echo "container-org=aryanpola" >> $GITHUB_OUTPUT
+            echo "container-image=sample-application" >> $GITHUB_OUTPUT
+            echo "full-image-name=aryanpola/sample-application" >> $GITHUB_OUTPUT
+          fi
+          
+          # Extract container registry configuration from platform-requirements.yml
+          if [ -f "platform-requirements.yml" ]; then
+            echo "container-registry=$(yq '.container.registry // "docker.io"' platform-requirements.yml)" >> $GITHUB_OUTPUT
+            echo "container-org=$(yq '.container.organization // "aryanpola"' platform-requirements.yml)" >> $GITHUB_OUTPUT
+            echo "container-image=$(yq '.container.image // .app.name' platform-requirements.yml)" >> $GITHUB_OUTPUT
+            
+            # Build full image name based on registry
+            REGISTRY=$(yq '.container.registry // "docker.io"' platform-requirements.yml)
+            ORG=$(yq '.container.organization // "aryanpola"' platform-requirements.yml)
+            IMAGE=$(yq '.container.image // .app.name' platform-requirements.yml)
+            
+            if [ "$REGISTRY" = "docker.io" ]; then
+              echo "full-image-name=$ORG/$IMAGE" >> $GITHUB_OUTPUT
+            else
+              echo "full-image-name=$REGISTRY/$ORG/$IMAGE" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⚠️  platform-requirements.yml not found, using defaults"
+            echo "container-registry=docker.io" >> $GITHUB_OUTPUT
+            echo "container-org=aryanpola" >> $GITHUB_OUTPUT
+            echo "container-image=sample-application" >> $GITHUB_OUTPUT
+            echo "full-image-name=aryanpola/sample-application" >> $GITHUB_OUTPUT
+          fi
           
           echo "✅ Platform test configuration loaded from app developer:"
           cat application-test.yml
@@ -123,8 +173,8 @@ jobs:
     # Platform Rule: Only build if ALL enabled tests pass
     if: always() && (needs.test-frontend.result == 'success' || needs.test-frontend.result == 'skipped') && (needs.test-backend.result == 'success' || needs.test-backend.result == 'skipped') && github.event_name == 'push'
     env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}
+      REGISTRY: docker.io
+      IMAGE_NAME: ${{ needs.read-test-config.outputs.full-image-name }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -133,20 +183,16 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=sha,prefix={{branch}}-,format=short
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

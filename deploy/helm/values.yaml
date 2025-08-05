@@ -2,8 +2,8 @@
 replicaCount: 2
 
 image:
-  repository: ghcr.io/aryan-spanda/test-application
-  # tag: managed by ArgoCD Image Updater via Helm parameters
+  repository: docker.io/aryanpola/sample-application
+  tag: "latest"
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
