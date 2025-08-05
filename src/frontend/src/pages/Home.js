@@ -162,7 +162,7 @@ const Home = () => {
   return (
     <Container>
       <TestBanner>
-        🔥 TESTING ARGOCD IMAGE UPDATER - Frontend Updated at {new Date().toLocaleString()} 🔥
+        🎉 IT WORKS! ArgoCD GitOps triggered at {new Date().toLocaleString()} 🎉
       </TestBanner>
       
       <HeroSection>
