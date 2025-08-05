@@ -1,6 +1,4 @@
-# Application Repository CI/CD Workflow - No Automatic Helm Generation
-# This workflow manages Helm values manually and calls platform CI/CD for building
-
+# Application CI/CD - Calls Platform Reusable Workflow
 name: Build and Deploy Test Application
 
 on:

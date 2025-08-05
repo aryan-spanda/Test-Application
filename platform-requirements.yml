@@ -37,6 +37,13 @@ gitops:
   tagPattern: "^testing-[0-9a-f]{7,8}$"
   updateStrategy: "newest-build"
 
+# Section 2.2: Container Configuration
+# ---------------------------------------------------------------------
+container:
+  registry: "docker.io"
+  organization: "aryanpola"
+  image: "sample-application"
+
 # Section 3: Platform Module Requirements
 # ---------------------------------------------------------------------
 platform:
