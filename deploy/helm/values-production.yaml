@@ -1,0 +1,49 @@
+# Environment-specific values for production
+replicaCount: 3
+
+image:
+  # tag: managed by ArgoCD Image Updater via Helm parameters
+  pullPolicy: Always
+
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "test-app.spanda.local"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  tls:
+    - secretName: test-app-tls
+      hosts:
+        - test-app.spanda.local
+
+env:
+  NODE_ENV: production
+  LOG_LEVEL: warn
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - test-application
+        topologyKey: kubernetes.io/hostname
