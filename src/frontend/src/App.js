@@ -6,7 +6,7 @@ import Home from './pages/Home';
 import Users from './pages/Users';
 import About from './pages/About';
 
-// Testing Docker Hub integration with ArgoCD Image Updater automation - Aug 6, 2025 - retry build 🔄
+// Testing controlled ArgoCD Image Updater workflow - Aug 6, 2025 - trigger build ✨
 const AppContainer = styled.div`
   min-height: 100vh;
   background-color: #f8f9fa;
