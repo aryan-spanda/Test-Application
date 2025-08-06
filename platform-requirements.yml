@@ -48,29 +48,24 @@ container:
 # ---------------------------------------------------------------------
 platform:
   modules:
-    # --- Networking Modules ---
-    vpc_networking: true              # Virtual private cloud (Required)
-    external_load_balancer: true      # Public internet access
-    internal_load_balancer: true      # Internal service communication
+    # --- Available Networking Modules ---
+    address_management: true          # MetalLB and External-DNS address management
+    vpc_networking: true              # Virtual private cloud networking
+    external_load_balancer: true      # Public internet access load balancer
+    internal_load_balancer: true      # Internal service communication load balancer
     firewall: true                    # Security rules and network policies
-    ssl_termination: true             # HTTPS support
 
-    # --- Observability Modules ---
-    logging: true                     # Centralized logging
-    monitoring: true                  # Observability stack (Prometheus/Grafana)
-    metrics: true                     # Application metrics scraping
-
-    # TODO
-    # --- Core Services ---
-    secrets_management: true          # Secret store integration
-
-    # TODO
-    # --- Optional Modules (Disabled for Test App) ---
-    cdn: false                        # Content Delivery Network
-    waf: false                        # Web Application Firewall
-    service_mesh: false               # Advanced networking (Istio)
-    backup: false                     # Automated backups
-    disaster_recovery: false          # Multi-region failover
+    # --- Modules Not Yet Available (set to false) ---
+    ssl_termination: false            # HTTPS support (module removed)
+    logging: false                    # Centralized logging (module removed)
+    monitoring: false                 # Observability stack (module removed)
+    metrics: false                    # Application metrics (module removed)
+    secrets_management: false         # Secret store integration (module removed)
+    cdn: false                        # Content Delivery Network (module removed)
+    waf: false                        # Web Application Firewall (module removed)
+    service_mesh: false               # Advanced networking (module removed)
+    backup: false                     # Automated backups (module removed)
+    disaster_recovery: false          # Multi-region failover (module removed)
 
 # =====================================================================
 # NOTE: Application runtime configuration (replicas, image tags, CPU,

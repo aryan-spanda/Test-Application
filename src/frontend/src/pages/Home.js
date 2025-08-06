@@ -19,8 +19,7 @@ const TestBanner = styled.div`
   font-weight: bold;
   font-size: 1.2rem;
   animation: pulse 2s infinite;
-  /* Updated for GitOps Workflow Testing - Aug 5, 2025 - ArgoCD + Image Updater Active! */
-  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+  /* Updated for ArgoCD Image Updater configurable registry testing - Aug 4, 2025 */
   
   @keyframes pulse {
     0% { opacity: 1; }
@@ -167,15 +166,15 @@ const Home = () => {
       </TestBanner>
       
       <HeroSection>
-        <HeroTitle>🚀 Welcome to Spanda Test App - GitOps Edition! 🚀</HeroTitle>
+        <HeroTitle>🚀 Welcome to Spanda Test App 🚀</HeroTitle>
         <HeroSubtitle>
-          A full-stack application with automated GitOps deployment - Testing ArgoCD + Image Updater Workflow!
+          A full-stack application built for the Spanda Platform - Testing ArgoCD Image Updater!
         </HeroSubtitle>
         <div style={{ marginTop: '2rem' }}>
-          <strong>Powered by React + Node.js + Kubernetes + ArgoCD</strong>
+          <strong>Powered by React + Node.js + Kubernetes</strong>
         </div>
         <div style={{ marginTop: '1rem', fontSize: '1rem', opacity: '0.8' }}>
-          🔥 Updated: {new Date().toLocaleString()} - GitOps Workflow Active! 🔥
+          🔥 Updated: {new Date().toLocaleString()} - Testing GitOps Automation 🔥
         </div>
       </HeroSection>
 
