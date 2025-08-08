@@ -4,5 +4,5 @@ helm:
     value: aryanpola/sample-application
     forcestring: true
   - name: image.tag
-    value: testing-b68109c
+    value: testing-8a22ac8
     forcestring: true
