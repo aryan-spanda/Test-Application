@@ -245,3 +245,4 @@ cd frontend && docker build -t dummy-frontend:latest .
 - `REACT_APP_API_URL` - Backend API URL
 - `REACT_APP_ENV` - Environment name
 Testing CI/CD Pipeline - Fri Aug  8 11:23:48 IST 2025
+# Test automated CI/CD - Fri Aug  8 12:22:51 IST 2025
