@@ -4,7 +4,7 @@ helm:
     value: aryanpola/sample-application
     forcestring: true
   - name: image.tag
-    value: testing-88e35aa
+    value: testing-28b3fb3
     forcestring: true
   - name: platform.servicesEnabled
     value: "true"
