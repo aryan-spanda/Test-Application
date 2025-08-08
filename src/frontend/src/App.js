@@ -6,7 +6,7 @@ import Home from './pages/Home';
 import Users from './pages/Users';
 import About from './pages/About';
 
-// Testing controlled ArgoCD Image Updater workflow - Aug 6, 2025 - trigger build ✨
+// Testing CI/CD Pipeline - Aug 8, 2025 - Complete workflow test 🚀
 const AppContainer = styled.div`
   min-height: 100vh;
   background-color: #f8f9fa;
