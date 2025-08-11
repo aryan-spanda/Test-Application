@@ -334,21 +334,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    error: 'Not Found',
-    message: `Route ${req.originalUrl} not found`,
-    available_endpoints: [
-      'GET /',
-      'GET /health',
-      'GET /metrics',
-      'GET /api/users',
-      'GET /api/docs'
-    ]
-  });
-});
-
 // Catch all handler: send back React's index.html file for any non-API routes
 app.get('*', (req, res) => {
   // Don't serve index.html for API routes - they should return JSON errors
