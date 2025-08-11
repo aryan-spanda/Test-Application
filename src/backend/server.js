@@ -4,6 +4,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const promClient = require('prom-client');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -76,13 +77,21 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
+// Serve static files from the React app build directory
+app.use(express.static(path.join(__dirname, '../frontend/build')));
+
+// API Routes
 app.get('/', (req, res) => {
   res.json({
-    message: 'Welcome to Dummy Backend API',
+    message: 'Welcome to Fullstack Test Application',
+    description: 'Backend API with Frontend SPA serving',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
+    services: {
+      frontend: 'React SPA served at root path',
+      backend: 'API endpoints listed below'
+    },
     endpoints: {
       health: '/health',
       metrics: '/metrics',
@@ -340,6 +349,29 @@ app.use('*', (req, res) => {
   });
 });
 
+// Catch all handler: send back React's index.html file for any non-API routes
+app.get('*', (req, res) => {
+  // Don't serve index.html for API routes - they should return JSON errors
+  if (req.path.startsWith('/api') || 
+      req.path.startsWith('/health') || 
+      req.path.startsWith('/metrics')) {
+    return res.status(404).json({ 
+      error: 'Not Found', 
+      message: `Route ${req.path} not found`,
+      available_endpoints: [
+        'GET /',
+        'GET /health', 
+        'GET /metrics',
+        'GET /api/users',
+        'GET /api/docs'
+      ]
+    });
+  }
+  
+  // For all other routes, serve the React app
+  res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
+});
+
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM signal received: closing HTTP server');
@@ -353,7 +385,9 @@ process.on('SIGINT', () => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Dummy Backend API running on port ${PORT}`);
+  console.log(`🚀 Fullstack Test Application running on port ${PORT}`);
+  console.log(`📱 Frontend: React SPA served at http://localhost:${PORT}/`);
+  console.log(`🔧 Backend API: http://localhost:${PORT}/api`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Metrics: http://localhost:${PORT}/metrics`);
