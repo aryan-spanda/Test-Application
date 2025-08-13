@@ -94,3 +94,71 @@ metrics:
   enabled: true
   path: /metrics
   port: 3000
+
+# Network Policy Configuration - Application-Specific Traffic Rules
+# This defines what network traffic is allowed to/from this application
+networkPolicy:
+  enabled: true  # Set to false to disable network policies for this app
+  
+  # INGRESS - What traffic is allowed TO this application
+  ingress:
+    # Allow traffic from the ingress controller (nginx)
+    allowFromIngressController: true
+    
+    # Allow monitoring systems to scrape metrics
+    allowFromMonitoring: true
+    
+    # Allow traffic from other pods in the same namespace
+    allowFromSameNamespace: false
+    
+    # Custom ingress rules for specific use cases
+    customRules: []
+    # Example:
+    # - description: "Allow traffic from frontend app"
+    #   fromPods:
+    #     - labels:
+    #         app: frontend-app
+    #   ports:
+    #     - port: 3000
+    #       protocol: TCP
+  
+  # EGRESS - What traffic is allowed FROM this application
+  egress:
+    # Allow DNS resolution (required for external service calls)
+    allowDNS: true
+    
+    # Allow HTTPS traffic to external APIs/services
+    allowToInternet: true
+    
+    # Allow HTTP traffic to external services (less secure)
+    allowHTTP: false
+    
+    # Allow connections to database services
+    allowToDatabase: false
+    databaseServices: []
+    # Example:
+    # - namespace: "database"
+    #   labels:
+    #     app: postgresql
+    #   port: 5432
+    
+    # Allow traffic to other internal microservices
+    allowToOtherServices: false
+    internalServices: []
+    # Example:
+    # - namespace: "backend"
+    #   labels:
+    #     app: user-service
+    #   ports:
+    #     - port: 8080
+    #       protocol: TCP
+    
+    # Custom egress rules for specific external services
+    customRules: []
+    # Example:
+    # - description: "Allow traffic to external payment API"
+    #   toIPBlocks:
+    #     - cidr: "203.0.113.0/24"
+    #   ports:
+    #     - port: 443
+    #       protocol: TCP

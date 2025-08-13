@@ -1,0 +1,190 @@
+{{- if .Values.networkPolicy.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "test-application.fullname" . }}
+  labels:
+    {{- include "test-application.labels" . | nindent 4 }}
+  annotations:
+    description: "Network policy for {{ include "test-application.fullname" . }} defining allowed traffic flows"
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "test-application.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  # INGRESS RULES - What traffic is allowed TO this application
+  ingress:
+    {{- if .Values.networkPolicy.ingress.allowFromIngressController }}
+    # Allow traffic from the Ingress Controller (nginx)
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx  # Adjust based on your ingress-nginx namespace label
+      ports:
+        - protocol: TCP
+          port: {{ .Values.app.port }}  # Application port (3000)
+    {{- end }}
+    
+    {{- if .Values.networkPolicy.ingress.allowFromMonitoring }}
+    # Allow monitoring scraping (Prometheus, etc.)
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring  # Adjust based on your monitoring namespace
+      ports:
+        - protocol: TCP
+          port: {{ .Values.metrics.port }}  # Metrics port
+    {{- end }}
+    
+    {{- if .Values.networkPolicy.ingress.allowFromSameNamespace }}
+    # Allow traffic from other pods in the same namespace
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: {{ .Release.Namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.app.port }}
+    {{- end }}
+    
+    {{- range .Values.networkPolicy.ingress.customRules }}
+    # Custom ingress rule: {{ .description }}
+    - from:
+      {{- if .fromNamespaces }}
+      {{- range .fromNamespaces }}
+      - namespaceSelector:
+          matchLabels:
+            {{- toYaml .labels | nindent 12 }}
+      {{- end }}
+      {{- end }}
+      {{- if .fromPods }}
+      {{- range .fromPods }}
+      - podSelector:
+          matchLabels:
+            {{- toYaml .labels | nindent 12 }}
+      {{- end }}
+      {{- end }}
+      {{- if .fromIPBlocks }}
+      {{- range .fromIPBlocks }}
+      - ipBlock:
+          cidr: {{ .cidr }}
+          {{- if .except }}
+          except:
+            {{- toYaml .except | nindent 12 }}
+          {{- end }}
+      {{- end }}
+      {{- end }}
+      ports:
+        {{- range .ports }}
+        - protocol: {{ .protocol | default "TCP" }}
+          port: {{ .port }}
+        {{- end }}
+    {{- end }}
+
+  # EGRESS RULES - What traffic is allowed FROM this application
+  egress:
+    {{- if .Values.networkPolicy.egress.allowDNS }}
+    # Allow DNS resolution (handled by global policy, but explicit here for clarity)
+    - to: []  # Allow to any destination
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- end }}
+    
+    {{- if .Values.networkPolicy.egress.allowToInternet }}
+    # Allow HTTPS traffic to external services (APIs, etc.)
+    - to: []  # Allow to any external destination
+      ports:
+        - protocol: TCP
+          port: 443
+        {{- if .Values.networkPolicy.egress.allowHTTP }}
+        - protocol: TCP
+          port: 80
+        {{- end }}
+    {{- end }}
+    
+    {{- if .Values.networkPolicy.egress.allowToDatabase }}
+    # Allow traffic to database services
+    {{- range .Values.networkPolicy.egress.databaseServices }}
+    - to:
+      {{- if .namespace }}
+      - namespaceSelector:
+          matchLabels:
+            name: {{ .namespace }}
+        podSelector:
+          matchLabels:
+            {{- toYaml .labels | nindent 12 }}
+      {{- else }}
+      - podSelector:
+          matchLabels:
+            {{- toYaml .labels | nindent 12 }}
+      {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .port }}
+    {{- end }}
+    {{- end }}
+    
+    {{- if .Values.networkPolicy.egress.allowToOtherServices }}
+    # Allow traffic to other internal services
+    {{- range .Values.networkPolicy.egress.internalServices }}
+    - to:
+      {{- if .namespace }}
+      - namespaceSelector:
+          matchLabels:
+            name: {{ .namespace }}
+        podSelector:
+          matchLabels:
+            {{- toYaml .labels | nindent 12 }}
+      {{- else }}
+      - podSelector:
+          matchLabels:
+            {{- toYaml .labels | nindent 12 }}
+      {{- end }}
+      ports:
+        {{- range .ports }}
+        - protocol: {{ .protocol | default "TCP" }}
+          port: {{ .port }}
+        {{- end }}
+    {{- end }}
+    {{- end }}
+    
+    {{- range .Values.networkPolicy.egress.customRules }}
+    # Custom egress rule: {{ .description }}
+    - to:
+      {{- if .toNamespaces }}
+      {{- range .toNamespaces }}
+      - namespaceSelector:
+          matchLabels:
+            {{- toYaml .labels | nindent 12 }}
+      {{- end }}
+      {{- end }}
+      {{- if .toPods }}
+      {{- range .toPods }}
+      - podSelector:
+          matchLabels:
+            {{- toYaml .labels | nindent 12 }}
+      {{- end }}
+      {{- end }}
+      {{- if .toIPBlocks }}
+      {{- range .toIPBlocks }}
+      - ipBlock:
+          cidr: {{ .cidr }}
+          {{- if .except }}
+          except:
+            {{- toYaml .except | nindent 12 }}
+          {{- end }}
+      {{- end }}
+      {{- end }}
+      ports:
+        {{- range .ports }}
+        - protocol: {{ .protocol | default "TCP" }}
+          port: {{ .port }}
+        {{- end }}
+    {{- end }}
+{{- end }}

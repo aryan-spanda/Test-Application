@@ -1,4 +1,59 @@
-# Environment-specific values for production
+# Production environment values - maximum security
+replicaCount: 3
+
+image:
+  pullPolicy: IfNotPresent
+
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "test-app.spanda.io"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  tls:
+    - secretName: test-app-prod-tls
+      hosts:
+        - test-app.spanda.io
+
+env:
+  NODE_ENV: production
+  LOG_LEVEL: warn
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# Network Policy - Production Environment
+# Strict security with minimal required access
+networkPolicy:
+  enabled: true
+  ingress:
+    allowFromIngressController: true
+    allowFromMonitoring: true
+    allowFromSameNamespace: false  # Strict isolation in production
+  egress:
+    allowDNS: true
+    allowToInternet: true
+    allowHTTP: false  # HTTPS only in production
+    # Add specific external services if needed
+    customRules:
+      - description: "Allow access to external payment API"
+        toIPBlocks:
+          - cidr: "203.0.113.0/24"  # Example payment gateway IP range
+        ports:
+          - port: 443
+            protocol: TCP
 replicaCount: 3
 
 image:

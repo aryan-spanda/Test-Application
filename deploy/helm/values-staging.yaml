@@ -1,4 +1,67 @@
-# Environment-specific values for staging
+# Staging environment values - production-like with some flexibility
+replicaCount: 2
+
+image:
+  pullPolicy: IfNotPresent
+
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "test-app-staging.spanda.io"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+  tls:
+    - secretName: test-app-staging-tls
+      hosts:
+        - test-app-staging.spanda.io
+
+env:
+  NODE_ENV: staging
+  LOG_LEVEL: info
+
+resources:
+  limits:
+    cpu: 300m
+    memory: 384Mi
+  requests:
+    cpu: 150m
+    memory: 192Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 75
+
+# Network Policy - Staging Environment
+# Production-like security with some debugging flexibility
+networkPolicy:
+  enabled: true
+  ingress:
+    allowFromIngressController: true
+    allowFromMonitoring: true
+    allowFromSameNamespace: false  # Same as production
+    # Allow testing tools in staging
+    customRules:
+      - description: "Allow load testing tools"
+        fromPods:
+          - labels:
+              app: load-tester
+        ports:
+          - port: 3000
+            protocol: TCP
+  egress:
+    allowDNS: true
+    allowToInternet: true
+    allowHTTP: false  # HTTPS only, like production
+    # Allow connection to staging databases
+    allowToDatabase: true
+    databaseServices:
+      - namespace: "database-staging"
+        labels:
+          app: postgresql
+        port: 5432
 replicaCount: 2
 
 image:

@@ -33,3 +33,17 @@ probes:
     initialDelaySeconds: 10
   readiness:
     initialDelaySeconds: 3
+
+# Network Policy - Development Environment
+# More permissive for debugging and development
+networkPolicy:
+  enabled: false  # Disabled in dev for easier debugging
+  # When enabled, use these settings:
+  # ingress:
+  #   allowFromIngressController: true
+  #   allowFromMonitoring: true
+  #   allowFromSameNamespace: true  # Allow cross-pod communication for testing
+  # egress:
+  #   allowDNS: true
+  #   allowToInternet: true
+  #   allowHTTP: true  # Allow HTTP for dev APIs
