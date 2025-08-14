@@ -14,7 +14,7 @@ frontend:
   replicaCount: 2
   image:
     repository: docker.io/aryanpola/sample-application
-    tag: "frontend-latest"
+    tag: "frontend-testing-latest"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -39,7 +39,7 @@ backend:
   replicaCount: 2
   image:
     repository: docker.io/aryanpola/sample-application
-    tag: "backend-latest" 
+    tag: "backend-testing-latest" 
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
