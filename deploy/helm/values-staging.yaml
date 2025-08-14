@@ -1,6 +1,10 @@
 # Staging environment values - production-like with some flexibility
 replicaCount: 2
 
+# Enable microservices deployment mode
+app:
+  deploymentMode: microservices
+
 image:
   pullPolicy: IfNotPresent
 

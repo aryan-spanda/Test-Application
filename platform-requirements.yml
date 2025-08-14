@@ -15,6 +15,28 @@ app:
   chartPath: "deploy/helm"
   type: "fullstack"
   team: "development-team"
+
+# Section 1.1: Microservices Configuration (Auto-Discovery)
+# ---------------------------------------------------------------------
+# The platform will automatically discover microservices by scanning src/ directory
+# for subdirectories containing Dockerfiles. You can override this behavior by 
+# explicitly defining microservices below:
+# 
+# microservices:
+#   - name: "frontend"
+#     dockerfile: "src/frontend/Dockerfile"
+#     port: 3000
+#   - name: "backend"  
+#     dockerfile: "src/backend/Dockerfile"
+#     port: 8080
+#   - name: "api"
+#     dockerfile: "src/api/Dockerfile" 
+#     port: 9000
+#   - name: "worker"
+#     dockerfile: "src/worker/Dockerfile"
+#
+# If not specified, auto-discovery will find all src/*/Dockerfile patterns
+# Auto-discovery is recommended for most use cases
   
 # Section 1.1: Container Registry Configuration
 # ---------------------------------------------------------------------

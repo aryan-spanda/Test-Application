@@ -1,6 +1,10 @@
 # Production environment values - maximum security
 replicaCount: 3
 
+# Enable microservices deployment mode
+app:
+  deploymentMode: microservices
+
 image:
   pullPolicy: IfNotPresent
 

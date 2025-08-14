@@ -6,6 +6,123 @@ metadata:
   labels:
     {{- include "test-application.labels" . | nindent 4 }}
   annotations:
+    description: "Network policy for {{ include "test-application.fullname" . }} unified application"
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "test-application.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  # INGRESS RULES - What traffic is allowed TO this application
+  ingress:
+    {{- if .Values.networkPolicy.ingress.allowFromIngressController }}
+    # Allow traffic from the Ingress Controller (provided by platform)
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: {{ .Values.app.ports.frontend }}
+    {{- end }}
+    
+    {{- if .Values.networkPolicy.ingress.allowFromMonitoring }}
+    # Allow monitoring scraping (provided by platform)
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+      ports:
+        - protocol: TCP
+          port: {{ .Values.app.ports.frontend }}
+    {{- end }}
+    
+    {{- if .Values.networkPolicy.ingress.allowFromSameNamespace }}
+    # Allow traffic from other pods in the same namespace
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: {{ .Release.Namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.app.ports.frontend }}
+    {{- end }}
+    
+    {{- range .Values.networkPolicy.ingress.customRules }}
+    # {{ .description }}
+    - from:
+      {{- range .fromPods }}
+      - podSelector:
+          matchLabels:
+            {{- toYaml .labels | nindent 12 }}
+      {{- end }}
+      ports:
+        {{- range .ports }}
+        - protocol: {{ .protocol }}
+          port: {{ .port }}
+        {{- end }}
+    {{- end }}
+  
+  # EGRESS RULES - What traffic is allowed FROM this application
+  egress:
+    {{- if .Values.networkPolicy.egress.allowDNS }}
+    # Allow DNS resolution (required for external service calls)
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- end }}
+    
+    {{- if .Values.networkPolicy.egress.allowToInternet }}
+    # Allow HTTPS to external services
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+    
+    {{- if .Values.networkPolicy.egress.allowHTTP }}
+    # Allow HTTP to external services (less secure)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 80
+    {{- end }}
+    
+    {{- range .Values.networkPolicy.egress.customRules }}
+    # {{ .description }}
+    - to:
+      {{- if .toIPBlocks }}
+      {{- range .toIPBlocks }}
+      - ipBlock:
+          cidr: {{ .cidr }}
+      {{- end }}
+      {{- end }}
+      {{- if .toPods }}
+      {{- range .toPods }}
+      - podSelector:
+          matchLabels:
+            {{- toYaml .labels | nindent 12 }}
+      {{- end }}
+      {{- end }}
+      ports:
+        {{- range .ports }}
+        - protocol: {{ .protocol }}
+          port: {{ .port }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "test-application.fullname" . }}
+  labels:
+    {{- include "test-application.labels" . | nindent 4 }}
+  annotations:
     description: "Network policy for {{ include "test-application.fullname" . }} defining allowed traffic flows"
 spec:
   podSelector:

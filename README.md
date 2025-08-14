@@ -2,7 +2,7 @@
 
 A comprehensive full-stack application for testing Spanda AI platform capabilities including networking, monitoring, and GitOps deployment workflows.
 
-**Latest Update**: Testing complete CI/CD pipeline for demo - August 8, 2025
+**Latest Update**: Testing ArgoCD Image Updater integration - August 4, 2025
 
 ## 🌟 Features
 
@@ -30,20 +30,39 @@ A comprehensive full-stack application for testing Spanda AI platform capabiliti
 
 ## 🏗️ Architecture
 
+### Deployment Modes
+
+This application supports both **unified** and **microservices** deployment architectures:
+
+**Unified Mode**: Single container deployment
+```
+┌─────────────────────────────────────────┐
+│           Single Pod                    │
+│  ┌─────────────────┐ ┌─────────────────┐ │
+│  │   Frontend      │ │     Backend     │ │
+│  │   Dashboard     │◄┤   Express API   │ │
+│  │   (HTML/CSS/JS) │ │   Node.js       │ │
+│  └─────────────────┘ └─────────────────┘ │
+└─────────────────────────────────────────┘
+```
+
+**Microservices Mode**: Separate pods with independent scaling
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Frontend      │    │     Backend     │    │   Monitoring    │
-│   Dashboard     │◄──►│   Express API   │◄──►│   Prometheus    │
-│   (HTML/CSS/JS) │    │   Node.js       │    │   Metrics       │
+│   Pod(s)        │◄──►│   Pod(s)        │◄──►│   Prometheus    │
+│   (NGINX+React) │    │   (Node.js API) │    │   Metrics       │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          │                       │                       │
          ▼                       ▼                       ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Load Balancer │    │   Database      │    │   Health Checks │
-│   (MetalLB)     │    │   (Simulated)   │    │   /health       │
+│   Load Balancer │    │   Network       │    │   Health Checks │
+│   (MetalLB)     │    │   Policies      │    │   /health       │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
+
+📖 **[Read the complete Microservices Guide](docs/MICROSERVICES-GUIDE.md)** for detailed architecture documentation.
 
 ## 🚀 Quick Start
 
@@ -244,5 +263,3 @@ cd frontend && docker build -t dummy-frontend:latest .
 ### Frontend
 - `REACT_APP_API_URL` - Backend API URL
 - `REACT_APP_ENV` - Environment name
-Testing CI/CD Pipeline - Fri Aug  8 11:23:48 IST 2025
-# Test automated CI/CD - Fri Aug  8 12:22:51 IST 2025

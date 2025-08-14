@@ -1,228 +1,266 @@
-# Application CI/CD - Calls Platform Reusable Workflow
-name: Build and Deploy Test Application
+# Universal CI/CD Workflow Template for Microservices
+# This template dynamically builds all microservices found in src/ directory
+# Works for applications with any number of microservices (2, 3, 4, etc.)
+
+name: Build and Deploy Microservices
 
 on:
   push:
-    branches: [main, develop, cicd, testing]
-    paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - 'RESTRUCTURE.md'
-      - 'PLATFORM-REQUIREMENTS.md'
+    branches: [ main, develop, testing ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
-permissions:
-  contents: write
-  packages: write
-  security-events: write
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: aryanpola/sample-application
 
 jobs:
-  # ===================================================================
-  # PHASE 1: READ APP DEVELOPER'S TEST CONFIGURATION
-  # ===================================================================
-  read-test-config:
-    name: Read Platform Test Configuration
+  # Job 1: Discover microservices dynamically
+  discover:
     runs-on: ubuntu-latest
     outputs:
-      frontend-enabled: ${{ steps.config.outputs.frontend-enabled }}
-      backend-enabled: ${{ steps.config.outputs.backend-enabled }}
-      frontend-working-dir: ${{ steps.config.outputs.frontend-working-dir }}
-      backend-working-dir: ${{ steps.config.outputs.backend-working-dir }}
-      frontend-setup-commands: ${{ steps.config.outputs.frontend-setup-commands }}
-      backend-setup-commands: ${{ steps.config.outputs.backend-setup-commands }}
-      frontend-test-command: ${{ steps.config.outputs.frontend-test-command }}
-      backend-test-command: ${{ steps.config.outputs.backend-test-command }}
-      app-name: ${{ steps.config.outputs.app-name }}
-      container-registry: ${{ steps.config.outputs.container-registry }}
-      container-org: ${{ steps.config.outputs.container-org }}
-      container-image: ${{ steps.config.outputs.container-image }}
-      full-image-name: ${{ steps.config.outputs.full-image-name }}
+      services: ${{ steps.find-services.outputs.services }}
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        
-      - name: Parse Platform Test Configuration
-        id: config
-        run: |
-          # Install yq for YAML parsing
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-          
-          # Platform Contract: App developers MUST provide application-test.yml
-          if [ ! -f "application-test.yml" ]; then
-            echo "❌ ERROR: application-test.yml not found!"
-            echo "Application developers must provide this file to specify their tests."
-            exit 1
-          fi
-          
-          # Read configuration provided by app developer
-          echo "frontend-enabled=$(yq '.tests.frontend.enabled' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "backend-enabled=$(yq '.tests.backend.enabled' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "frontend-working-dir=$(yq '.tests.frontend.working_directory' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "backend-working-dir=$(yq '.tests.backend.working_directory' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "frontend-setup-commands=$(yq '.tests.frontend.setup_commands | join(" && ")' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "backend-setup-commands=$(yq '.tests.backend.setup_commands | join(" && ")' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "frontend-test-command=$(yq '.tests.frontend.test_command' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "backend-test-command=$(yq '.tests.backend.test_command' application-test.yml)" >> $GITHUB_OUTPUT
-          echo "app-name=$(yq '.app.name' application-test.yml)" >> $GITHUB_OUTPUT
-          
-          # Extract container configuration from platform-requirements.yml
-          if [ -f "platform-requirements.yml" ]; then
-            REGISTRY=$(yq '.container.registry // "docker.io"' platform-requirements.yml)
-            ORG=$(yq '.container.organization // "aryanpola"' platform-requirements.yml)
-            IMAGE=$(yq '.container.image // "sample-application"' platform-requirements.yml)
-            
-            echo "container-registry=$REGISTRY" >> $GITHUB_OUTPUT
-            echo "container-org=$ORG" >> $GITHUB_OUTPUT
-            echo "container-image=$IMAGE" >> $GITHUB_OUTPUT
-            
-            if [ "$REGISTRY" = "docker.io" ]; then
-              echo "full-image-name=$ORG/$IMAGE" >> $GITHUB_OUTPUT
-            else
-              echo "full-image-name=$REGISTRY/$ORG/$IMAGE" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "container-registry=docker.io" >> $GITHUB_OUTPUT
-            echo "container-org=aryanpola" >> $GITHUB_OUTPUT
-            echo "container-image=sample-application" >> $GITHUB_OUTPUT
-            echo "full-image-name=aryanpola/sample-application" >> $GITHUB_OUTPUT
-          fi
-          
-          # Extract container registry configuration from platform-requirements.yml
-          if [ -f "platform-requirements.yml" ]; then
-            echo "container-registry=$(yq '.container.registry // "docker.io"' platform-requirements.yml)" >> $GITHUB_OUTPUT
-            echo "container-org=$(yq '.container.organization // "aryanpola"' platform-requirements.yml)" >> $GITHUB_OUTPUT
-            echo "container-image=$(yq '.container.image // .app.name' platform-requirements.yml)" >> $GITHUB_OUTPUT
-            
-            # Build full image name based on registry
-            REGISTRY=$(yq '.container.registry // "docker.io"' platform-requirements.yml)
-            ORG=$(yq '.container.organization // "aryanpola"' platform-requirements.yml)
-            IMAGE=$(yq '.container.image // .app.name' platform-requirements.yml)
-            
-            if [ "$REGISTRY" = "docker.io" ]; then
-              echo "full-image-name=$ORG/$IMAGE" >> $GITHUB_OUTPUT
-            else
-              echo "full-image-name=$REGISTRY/$ORG/$IMAGE" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "⚠️  platform-requirements.yml not found, using defaults"
-            echo "container-registry=docker.io" >> $GITHUB_OUTPUT
-            echo "container-org=aryanpola" >> $GITHUB_OUTPUT
-            echo "container-image=sample-application" >> $GITHUB_OUTPUT
-            echo "full-image-name=aryanpola/sample-application" >> $GITHUB_OUTPUT
-          fi
-          
-          echo "✅ Platform test configuration loaded from app developer:"
-          cat application-test.yml
-
-  # ===================================================================
-  # PHASE 2: EXECUTE APP DEVELOPER'S TESTS (Technology Agnostic)
-  # ===================================================================
-  test-frontend:
-    name: Frontend Tests (App Developer Specified)
-    runs-on: ubuntu-latest
-    needs: read-test-config
-    if: needs.read-test-config.outputs.frontend-enabled == 'true'
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        
-      # Platform doesn't care about technology - just runs what app dev specified
-      - name: Run App Developer's Frontend Setup Commands
-        run: |
-          cd ${{ needs.read-test-config.outputs.frontend-working-dir }}
-          ${{ needs.read-test-config.outputs.frontend-setup-commands }}
-          
-      - name: Run App Developer's Frontend Tests
-        run: |
-          cd ${{ needs.read-test-config.outputs.frontend-working-dir }}
-          ${{ needs.read-test-config.outputs.frontend-test-command }}
-        env:
-          CI: true
-
-  test-backend:
-    name: Backend Tests (App Developer Specified)
-    runs-on: ubuntu-latest
-    needs: read-test-config
-    if: needs.read-test-config.outputs.backend-enabled == 'true'
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        
-      # Platform doesn't care about technology - just runs what app dev specified
-      - name: Run App Developer's Backend Setup Commands
-        run: |
-          cd ${{ needs.read-test-config.outputs.backend-working-dir }}
-          ${{ needs.read-test-config.outputs.backend-setup-commands }}
-          
-      - name: Run App Developer's Backend Tests
-        run: |
-          cd ${{ needs.read-test-config.outputs.backend-working-dir }}
-          ${{ needs.read-test-config.outputs.backend-test-command }}
-
-  # ===================================================================
-  # PHASE 3: BUILD CONTAINER (Platform Responsibility)
-  # ===================================================================
-  build-and-push:
-    name: Build and Push Container
-    runs-on: ubuntu-latest
-    needs: [read-test-config, test-frontend, test-backend]
-    # Platform Rule: Only build if ALL enabled tests pass
-    if: always() && (needs.test-frontend.result == 'success' || needs.test-frontend.result == 'skipped') && (needs.test-backend.result == 'success' || needs.test-backend.result == 'skipped') && github.event_name == 'push'
-    env:
-      REGISTRY: docker.io
-      IMAGE_NAME: ${{ needs.read-test-config.outputs.full-image-name }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Login to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,prefix={{branch}}-,format=short
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  # ===================================================================
-  # PHASE 3: VALIDATE HELM CHARTS (Platform Quality Gate)
-  # ===================================================================
-  validate-helm:
-    name: Validate Helm Charts
-    runs-on: ubuntu-latest
-    needs: [build-and-push]  # Run after successful build
-    steps:
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Set up Helm
-      uses: azure/setup-helm@v3
-      with:
-        version: '3.12.0'
-
-    - name: Validate Helm charts
+      
+    - name: Find microservices
+      id: find-services
       run: |
-        helm lint deploy/helm/
+        # Find all directories in src/ that contain a Dockerfile
+        services=$(find src/ -name "Dockerfile" -exec dirname {} \; | sed 's|src/||' | jq -R -s -c 'split("\n")[:-1]')
+        echo "services=$services" >> $GITHUB_OUTPUT
+        echo "Found services: $services"
+
+  # Job 2: Build all discovered microservices
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.discover.outputs.services) }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Extract metadata for ${{ matrix.service }}
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch,suffix=-${{ matrix.service }}
+          type=ref,event=pr,suffix=-${{ matrix.service }}
+          type=sha,prefix=${{ matrix.service }}-
+          type=raw,value=${{ matrix.service }}-latest,enable={{is_default_branch}}
+    
+    # Build and push each microservice
+    - name: Build and push ${{ matrix.service }} image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./src/${{ matrix.service }}/Dockerfile
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.service }}-${{ github.sha }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.service }}-${{ github.ref_name }}-${{ github.sha }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.service }}-latest
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.service }}-${{ github.ref_name }}-latest
+        cache-from: type=gha,scope=${{ matrix.service }}
+        cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # Job 3: Update deployment manifests (optional)
+  deploy:
+    needs: [discover, build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing' || github.ref == 'refs/heads/staging'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Update deployment manifests
+      run: |
+        echo "Built images for services: ${{ needs.discover.outputs.services }}"
+        # Example: Update Helm values or trigger ArgoCD
+        for service in $(echo '${{ needs.discover.outputs.services }}' | jq -r '.[]'); do
+          echo "Service: $service"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${service}-${{ github.sha }}"
+          
+          # Add your deployment logic here:
+          # - Update Helm values files
+          # - Trigger ArgoCD sync
+          # - Update Kubernetes manifests
+          # - Send webhook to deployment system
+        done
         
-        # Template the charts to check for syntax errors  
-        helm template test-app deploy/helm/ --values deploy/helm/values-dev.yaml > /dev/null || echo "⚠️  values-dev.yaml not found"
-        helm template test-app deploy/helm/ --values deploy/helm/values-staging.yaml > /dev/null || echo "⚠️  values-staging.yaml not found"
-        helm template test-app deploy/helm/ --values deploy/helm/values-production.yaml > /dev/null || echo "⚠️  values-production.yaml not found"
+# ============================================================================
+# Templates for Other CI/CD Platforms
+# ============================================================================
+
+# GitLab CI (.gitlab-ci.yml) - Dynamic microservices build:
+# 
+# stages:
+#   - discover
+#   - build
+#   - deploy
+# 
+# discover-services:
+#   stage: discover
+#   script:
+#     - services=$(find src/ -name "Dockerfile" -exec dirname {} \; | sed 's|src/||')
+#     - echo "$services" | tee services.txt
+#   artifacts:
+#     paths:
+#       - services.txt
+# 
+# build-microservices:
+#   stage: build
+#   parallel:
+#     matrix:
+#       - SERVICE: [frontend, backend, api, worker]  # or read from services.txt
+#   script:
+#     - docker build -f src/$SERVICE/Dockerfile -t $CI_REGISTRY_IMAGE:$SERVICE-$CI_COMMIT_SHA .
+#     - docker push $CI_REGISTRY_IMAGE:$SERVICE-$CI_COMMIT_SHA
+#   rules:
+#     - if: -f "src/$SERVICE/Dockerfile"
+
+# Jenkins Pipeline (Jenkinsfile) - Dynamic microservices build:
+#
+# pipeline {
+#     agent any
+#     stages {
+#         stage('Discover Services') {
+#             steps {
+#                 script {
+#                     def services = sh(
+#                         script: "find src/ -name 'Dockerfile' -exec dirname {} \\; | sed 's|src/||'",
+#                         returnStdout: true
+#                     ).trim().split('\n')
+#                     env.SERVICES = services.join(',')
+#                     echo "Found services: ${env.SERVICES}"
+#                 }
+#             }
+#         }
+#         stage('Build Services') {
+#             steps {
+#                 script {
+#                     def services = env.SERVICES.split(',')
+#                     def builds = [:]
+#                     
+#                     services.each { service ->
+#                         builds[service] = {
+#                             node {
+#                                 def image = docker.build("aryanpola/sample-application:${service}-${env.BUILD_ID}", "-f src/${service}/Dockerfile .")
+#                                 docker.withRegistry('https://docker.io', 'docker-hub-credentials') {
+#                                     image.push("${service}-${env.BUILD_ID}")
+#                                     image.push("${service}-latest")
+#                                 }
+#                             }
+#                         }
+#                     }
+#                     parallel builds
+#                 }
+#             }
+#         }
+#     }
+# }
+
+# Azure DevOps Pipeline (azure-pipelines.yml) - Dynamic microservices:
+#
+# trigger:
+# - main
+# - develop
+# 
+# pool:
+#   vmImage: 'ubuntu-latest'
+# 
+# stages:
+# - stage: Discover
+#   jobs:
+#   - job: FindServices
+#     steps:
+#     - script: |
+#         services=$(find src/ -name "Dockerfile" -exec dirname {} \; | sed 's|src/||' | tr '\n' ',' | sed 's/,$//')
+#         echo "##vso[task.setvariable variable=services;isOutput=true]$services"
+#       name: discover
+# 
+# - stage: Build
+#   dependsOn: Discover
+#   variables:
+#     services: $[ stageDependencies.Discover.FindServices.outputs['discover.services'] ]
+#   jobs:
+#   - job: BuildImages
+#     strategy:
+#       matrix:
+#         ${{ each service in split(variables.services, ',') }}:
+#           ${{ service }}:
+#             serviceName: ${{ service }}
+#     steps:
+#     - task: Docker@2
+#       inputs:
+#         command: 'buildAndPush'
+#         repository: 'aryanpola/sample-application'
+#         dockerfile: 'src/$(serviceName)/Dockerfile'
+#         tags: |
+#           $(serviceName)-$(Build.BuildId)
+#           $(serviceName)-latest
         
-        echo "✅ Helm chart validation completed"
+# For other CI/CD platforms:
+# 
+# GitLab CI (.gitlab-ci.yml):
+# 
+# stages:
+#   - build
+#   - deploy
+# 
+# build-frontend:
+#   stage: build
+#   script:
+#     - docker build -f src/frontend/Dockerfile -t $CI_REGISTRY_IMAGE:frontend-$CI_COMMIT_SHA .
+#     - docker push $CI_REGISTRY_IMAGE:frontend-$CI_COMMIT_SHA
+# 
+# build-backend:
+#   stage: build  
+#   script:
+#     - docker build -f src/backend/Dockerfile -t $CI_REGISTRY_IMAGE:backend-$CI_COMMIT_SHA .
+#     - docker push $CI_REGISTRY_IMAGE:backend-$CI_COMMIT_SHA
+#
+# Jenkins Pipeline (Jenkinsfile):
+#
+# pipeline {
+#     agent any
+#     stages {
+#         stage('Build Frontend') {
+#             steps {
+#                 script {
+#                     docker.build("aryanpola/sample-application:frontend-${env.BUILD_ID}", "-f src/frontend/Dockerfile .")
+#                     docker.withRegistry('https://docker.io', 'docker-hub-credentials') {
+#                         docker.image("aryanpola/sample-application:frontend-${env.BUILD_ID}").push()
+#                     }
+#                 }
+#             }
+#         }
+#         stage('Build Backend') {
+#             steps {
+#                 script {
+#                     docker.build("aryanpola/sample-application:backend-${env.BUILD_ID}", "-f src/backend/Dockerfile .")
+#                     docker.withRegistry('https://docker.io', 'docker-hub-credentials') {
+#                         docker.image("aryanpola/sample-application:backend-${env.BUILD_ID}").push()
+#                     }
+#                 }
+#             }
+#         }
+#     }
+# }

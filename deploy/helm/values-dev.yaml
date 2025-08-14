@@ -1,6 +1,10 @@
 # Environment-specific values for development
 replicaCount: 1
 
+# Enable microservices deployment mode
+app:
+  deploymentMode: microservices
+
 image:
   # tag: managed by ArgoCD Image Updater via Helm parameters.
   pullPolicy: Always

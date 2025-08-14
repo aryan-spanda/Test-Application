@@ -1,0 +1,21 @@
+{{- if eq .Values.app.deploymentMode "microservices" }}
+{{- if .Values.backend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "test-application.fullname" . }}-backend
+  labels:
+    {{- include "test-application.labels" . | nindent 4 }}
+    component: backend
+spec:
+  type: {{ .Values.backend.service.type }}
+  ports:
+    - port: {{ .Values.backend.service.port }}
+      targetPort: {{ .Values.backend.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "test-application.selectorLabels" . | nindent 4 }}
+    component: backend
+{{- end }}
+{{- end }}
