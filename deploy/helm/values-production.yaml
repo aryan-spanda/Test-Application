@@ -14,7 +14,7 @@ ingress:
   host: "test-app.spanda.io"
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/cluster-issuer: "letsencrypt-production"  # Corrected name
   tls:
     - secretName: test-app-prod-tls
       hosts:

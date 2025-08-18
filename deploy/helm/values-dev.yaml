@@ -15,6 +15,7 @@ ingress:
   host: "test-app-dev.spanda.local"
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"  # Use staging for dev
   tls:
     - secretName: test-app-dev-tls
       hosts:

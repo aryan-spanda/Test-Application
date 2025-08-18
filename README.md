@@ -171,6 +171,75 @@ kubectl apply -f deploy/
 - **Input Validation**: Request validation
 - **Non-root User**: Container runs as non-root user
 
+## 🔐 HTTPS/TLS Configuration
+
+The application is configured to use automatic TLS certificates via cert-manager. The certificate is automatically requested and managed when the application is deployed.
+
+### Environment-Specific Configuration
+
+**Development Environment:**
+- Uses `letsencrypt-staging` ClusterIssuer for testing
+- Domain: `test-app-dev.spanda.local`
+- Certificate Secret: `test-app-dev-tls`
+
+**Staging Environment:**
+- Uses `letsencrypt-staging` ClusterIssuer for safe testing
+- Domain: `test-app-staging.spanda.io`
+- Certificate Secret: `test-app-staging-tls`
+
+**Production Environment:**
+- Uses `letsencrypt-production` ClusterIssuer for real certificates
+- Domain: `test-app.spanda.io`
+- Certificate Secret: `test-app-prod-tls`
+
+### How it Works
+
+1. **Ingress Configuration**: The Ingress resource includes the annotation:
+   ```yaml
+   annotations:
+     cert-manager.io/cluster-issuer: "letsencrypt-staging"  # or letsencrypt-production
+   ```
+
+2. **Automatic Certificate Creation**: When deployed, cert-manager:
+   - Detects the annotation and TLS configuration
+   - Contacts Let's Encrypt to request a certificate
+   - Performs domain validation via HTTP-01 challenge
+   - Creates the TLS secret automatically
+
+3. **Certificate Renewal**: cert-manager automatically renews certificates before expiry
+
+### Verifying HTTPS
+
+```bash
+# Check if certificate was created
+kubectl get certificates -n <namespace>
+
+# Check certificate details
+kubectl describe certificate <cert-name> -n <namespace>
+
+# Check the TLS secret
+kubectl get secret <cert-secret-name> -n <namespace>
+
+# Test HTTPS access
+curl -k https://test-app-dev.spanda.local
+```
+
+### Troubleshooting
+
+```bash
+# Check cert-manager pods
+kubectl get pods -n platform-security | grep cert-manager
+
+# Check certificate requests
+kubectl get certificaterequests -A
+
+# Check challenges (for ACME validation)
+kubectl get challenges -A
+
+# Check ingress status
+kubectl describe ingress <ingress-name> -n <namespace>
+```
+
 ## 🎨 UI Features
 
 - **Responsive Design**: Works on all screen sizes
