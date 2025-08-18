@@ -16,7 +16,7 @@ frontend:
   replicaCount: 2
   image:
     repository: aryanpola/sample-application
-    tag: "frontend-testing-latest@sha256:c8cd237b72845c4ea4da483558f10591efd9a4ba09213fc76404aa8f08926d82"
+    tag: "frontend-testing-latest@sha256:a6456ed6dafd724ff3989d9a2d81a81e520e8aaee02c729d308cfff1649aab02"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -40,7 +40,7 @@ backend:
   replicaCount: 2
   image:
     repository: aryanpola/sample-application
-    tag: "backend-testing-latest@sha256:2426d976529e875784e0f11d95b994e8ccbac03a2517b1d5ce9b0d9dbea709a2"
+    tag: "backend-testing-latest@sha256:2617e077e6db932082fbf6c43c6e0be604b94b96b0bd58db21ee99fd0f890d5e"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
