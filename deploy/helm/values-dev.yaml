@@ -12,14 +12,14 @@ image:
 ingress:
   enabled: true
   className: "nginx"
-  host: "test-app-dev.spanda.local"
+  host: "test-app-dev.aryanpola.xyz"
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    cert-manager.io/cluster-issuer: "letsencrypt-staging"  # Use staging for dev
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"  # Now we can use Let's Encrypt with real domain
   tls:
     - secretName: test-app-dev-tls
       hosts:
-        - test-app-dev.spanda.local
+        - test-app-dev.aryanpola.xyz
 
 env:
   NODE_ENV: development

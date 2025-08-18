@@ -11,14 +11,14 @@ image:
 ingress:
   enabled: true
   className: "nginx"
-  host: "test-app-staging.spanda.io"
+  host: "test-app-staging.aryanpola.xyz"
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/cluster-issuer: "letsencrypt-staging"
   tls:
     - secretName: test-app-staging-tls
       hosts:
-        - test-app-staging.spanda.io
+        - test-app-staging.aryanpola.xyz
 
 env:
   NODE_ENV: staging

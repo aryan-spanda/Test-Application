@@ -11,14 +11,14 @@ image:
 ingress:
   enabled: true
   className: "nginx"
-  host: "test-app.spanda.io"
+  host: "test-app.aryanpola.xyz"
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/cluster-issuer: "letsencrypt-production"  # Corrected name
   tls:
     - secretName: test-app-prod-tls
       hosts:
-        - test-app.spanda.io
+        - test-app.aryanpola.xyz
 
 env:
   NODE_ENV: production

@@ -179,17 +179,17 @@ The application is configured to use automatic TLS certificates via cert-manager
 
 **Development Environment:**
 - Uses `letsencrypt-staging` ClusterIssuer for testing
-- Domain: `test-app-dev.spanda.local`
+- Domain: `test-app-dev.aryanpola.xyz`
 - Certificate Secret: `test-app-dev-tls`
 
 **Staging Environment:**
 - Uses `letsencrypt-staging` ClusterIssuer for safe testing
-- Domain: `test-app-staging.spanda.io`
+- Domain: `test-app-staging.aryanpola.xyz`
 - Certificate Secret: `test-app-staging-tls`
 
 **Production Environment:**
 - Uses `letsencrypt-production` ClusterIssuer for real certificates
-- Domain: `test-app.spanda.io`
+- Domain: `test-app.aryanpola.xyz`
 - Certificate Secret: `test-app-prod-tls`
 
 ### How it Works
@@ -221,7 +221,7 @@ kubectl describe certificate <cert-name> -n <namespace>
 kubectl get secret <cert-secret-name> -n <namespace>
 
 # Test HTTPS access
-curl -k https://test-app-dev.spanda.local
+curl -k https://test-app-dev.aryanpola.xyz
 ```
 
 ### Troubleshooting
