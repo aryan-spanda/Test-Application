@@ -1,20 +1,22 @@
 # Base values - environment agnostic defaults
+
 # Microservices architecture: separate pods for frontend and backend
 
 # Application configuration
+
 app:
   name: test-application
   version: "1.0.0"
   # Deployment mode: "microservices" for separate pods
-  deploymentMode: "microservices"
 
+  deploymentMode: "microservices"
 # Frontend service configuration (NGINX + React)
 frontend:
   enabled: true
   replicaCount: 2
   image:
-    repository: docker.io/aryanpola/sample-application
-    tag: "frontend-testing-latest"
+    repository: aryanpola/sample-application
+    tag: "frontend-testing-latest@sha256:ce108b85a404ee8a7c2ab7929546dfbb0c65e7b054d80f57a05158379a71bebc"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -32,14 +34,13 @@ frontend:
     minReplicas: 2
     maxReplicas: 5
     targetCPUUtilizationPercentage: 70
-
 # Backend service configuration (Node.js API)
 backend:
   enabled: true
   replicaCount: 2
   image:
-    repository: docker.io/aryanpola/sample-application
-    tag: "backend-testing-latest" 
+    repository: aryanpola/sample-application
+    tag: "backend-testing-latest@sha256:724fe9adfed7ab49051fffedfef724d12728aca3bbd4b0a95e68315f57c5561a"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -57,30 +58,24 @@ backend:
     minReplicas: 2
     maxReplicas: 8
     targetCPUUtilizationPercentage: 75
-
 # Legacy single container configuration (kept for compatibility)
 replicaCount: 2
 image:
   repository: docker.io/aryanpola/sample-application
   tag: "latest"
   pullPolicy: IfNotPresent
-
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
-
 serviceAccount:
   create: true
   annotations: {}
   name: ""
-
 podAnnotations: {}
-
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1001
   fsGroup: 1001
-
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
@@ -89,12 +84,10 @@ securityContext:
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 1001
-
 service:
   type: ClusterIP
   port: 80
   targetPort: 3000
-
 # Ingress disabled by default - enabled per environment
 ingress:
   enabled: false
@@ -102,7 +95,6 @@ ingress:
   host: ""
   annotations: {}
   tls: []
-
 resources:
   limits:
     cpu: 200m
@@ -110,27 +102,22 @@ resources:
   requests:
     cpu: 100m
     memory: 128Mi
-
 autoscaling:
   enabled: false
   minReplicas: 2
   maxReplicas: 10
   targetCPUUtilizationPercentage: 80
-
 nodeSelector: {}
 tolerations: []
 affinity: {}
-
 # Application configuration
 app:
   name: test-application
   version: "1.0.0"
   port: 3000
-
 # Environment variables - populated by overlays
 env:
   LOG_LEVEL: info
-
 # Health check configuration
 probes:
   liveness:
@@ -147,77 +134,91 @@ probes:
     periodSeconds: 5
     timeoutSeconds: 3
     failureThreshold: 3
-
 # Monitoring
 metrics:
   enabled: true
   path: /metrics
   port: 3000
-
 # Network Policy Configuration - Application-Specific Traffic Rules
+
 # This defines what network traffic is allowed to/from this application
 networkPolicy:
-  enabled: true  # Set to false to disable network policies for this app
-  
+  enabled: true # Set to false to disable network policies for this app
   # INGRESS - What traffic is allowed TO this application
   ingress:
     # Allow traffic from the ingress controller (nginx)
     allowFromIngressController: true
-    
     # Allow monitoring systems to scrape metrics
     allowFromMonitoring: true
-    
     # Allow traffic from other pods in the same namespace
     allowFromSameNamespace: false
-    
     # Custom ingress rules for specific use cases
     customRules: []
     # Example:
-    # - description: "Allow traffic from frontend app"
-    #   fromPods:
-    #     - labels:
-    #         app: frontend-app
-    #   ports:
-    #     - port: 3000
-    #       protocol: TCP
-  
+  # - description: "Allow traffic from frontend app"
+
+  #   fromPods:
+
+  #     - labels:
+
+  #         app: frontend-app
+
+  #   ports:
+
+  #     - port: 3000
+
+  #       protocol: TCP
+
   # EGRESS - What traffic is allowed FROM this application
   egress:
     # Allow DNS resolution (required for external service calls)
     allowDNS: true
-    
     # Allow HTTPS traffic to external APIs/services
     allowToInternet: true
-    
     # Allow HTTP traffic to external services (less secure)
     allowHTTP: false
-    
     # Allow connections to database services
     allowToDatabase: false
     databaseServices: []
     # Example:
+
     # - namespace: "database"
+
     #   labels:
+
     #     app: postgresql
+
     #   port: 5432
-    
+
     # Allow traffic to other internal microservices
     allowToOtherServices: false
     internalServices: []
     # Example:
+
     # - namespace: "backend"
+
     #   labels:
+
     #     app: user-service
+
     #   ports:
+
     #     - port: 8080
+
     #       protocol: TCP
-    
+
     # Custom egress rules for specific external services
     customRules: []
     # Example:
-    # - description: "Allow traffic to external payment API"
-    #   toIPBlocks:
-    #     - cidr: "203.0.113.0/24"
-    #   ports:
-    #     - port: 443
-    #       protocol: TCP
+
+# - description: "Allow traffic to external payment API"
+
+#   toIPBlocks:
+
+#     - cidr: "203.0.113.0/24"
+
+#   ports:
+
+#     - port: 443
+
+#       protocol: TCP
