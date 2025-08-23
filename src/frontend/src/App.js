@@ -6,7 +6,7 @@ import Home from './pages/Home';
 import Users from './pages/Users';
 import About from './pages/About';
 
-// Testing controlled ArgoCD Image Updater workflow - Change #8
+// Testing controlled ArgoCD Image Updater workflow - Change #9
 const AppContainer = styled.div`
   min-height: 100vh;
   background-color: #f8f9fa;
