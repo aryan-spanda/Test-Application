@@ -43,9 +43,7 @@ RUN mkdir -p /var/cache/nginx/client_temp /var/cache/nginx/proxy_temp /var/cache
     chown -R frontend:frontend /var/cache/nginx && \
     chown -R frontend:frontend /var/run && \
     chown -R frontend:frontend /etc/nginx/conf.d && \
-    chown -R frontend:frontend /usr/share/nginx/html && \
-    # Allow NGINX to bind to port 3000 as non-root
-    sed -i 's/listen       80;/listen       3000;/' /etc/nginx/conf.d/default.conf || true
+    chown -R frontend:frontend /usr/share/nginx/html
 
 # Switch to non-root user
 USER frontend
