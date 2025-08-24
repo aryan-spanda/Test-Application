@@ -36,14 +36,16 @@ RUN addgroup -g 1001 -S frontend && \
 COPY --from=builder --chown=frontend:frontend /app/src/frontend/build /usr/share/nginx/html
 
 # Copy custom NGINX configuration
-COPY --chown=frontend:frontend docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --chown=frontend:frontend docker/nginx.conf /etc/nginx/nginx.conf
 
 # Set up NGINX directories and permissions
 RUN mkdir -p /var/cache/nginx/client_temp /var/cache/nginx/proxy_temp /var/cache/nginx/fastcgi_temp /var/cache/nginx/uwsgi_temp /var/cache/nginx/scgi_temp && \
     chown -R frontend:frontend /var/cache/nginx && \
     chown -R frontend:frontend /var/run && \
-    chown -R frontend:frontend /etc/nginx/conf.d && \
-    chown -R frontend:frontend /usr/share/nginx/html
+    chown -R frontend:frontend /etc/nginx && \
+    chown -R frontend:frontend /usr/share/nginx/html && \
+    touch /tmp/access.log /tmp/error.log /tmp/nginx.pid && \
+    chown frontend:frontend /tmp/access.log /tmp/error.log /tmp/nginx.pid
 
 # Switch to non-root user
 USER frontend
