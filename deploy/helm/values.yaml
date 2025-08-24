@@ -16,7 +16,7 @@ frontend:
   replicaCount: 2
   image:
     repository: aryanpola/sample-application
-    tag: "frontend-4b4fcc5a18928b74f2d997009d3aaac53603baad"
+    tag: "frontend-ec7c88370910b46720bac3ffaf59d2b6802640b0"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -40,7 +40,7 @@ backend:
   replicaCount: 2
   image:
     repository: aryanpola/sample-application
-    tag: "backend-4b4fcc5a18928b74f2d997009d3aaac53603baad"
+    tag: "backend-ec7c88370910b46720bac3ffaf59d2b6802640b0"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
