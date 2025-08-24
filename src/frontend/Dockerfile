@@ -40,12 +40,14 @@ COPY --chown=frontend:frontend docker/nginx.conf /etc/nginx/nginx.conf
 
 # Set up NGINX directories and permissions
 RUN mkdir -p /var/cache/nginx/client_temp /var/cache/nginx/proxy_temp /var/cache/nginx/fastcgi_temp /var/cache/nginx/uwsgi_temp /var/cache/nginx/scgi_temp && \
+    mkdir -p /var/log/nginx && \
     chown -R frontend:frontend /var/cache/nginx && \
     chown -R frontend:frontend /var/run && \
     chown -R frontend:frontend /etc/nginx && \
     chown -R frontend:frontend /usr/share/nginx/html && \
-    touch /tmp/access.log /tmp/error.log /tmp/nginx.pid && \
-    chown frontend:frontend /tmp/access.log /tmp/error.log /tmp/nginx.pid
+    chown -R frontend:frontend /var/log/nginx && \
+    touch /var/log/nginx/access.log /var/log/nginx/error.log /tmp/nginx.pid && \
+    chown frontend:frontend /var/log/nginx/access.log /var/log/nginx/error.log /tmp/nginx.pid
 
 # Switch to non-root user
 USER frontend
