@@ -15,6 +15,8 @@ app:
   chartPath: "deploy/helm"
   type: "fullstack"
   team: "development-team"
+  # TENANT CONFIGURATION - REQUIRED FOR MULTI-TENANT DEPLOYMENTS
+  tenant: "test-application-2"  # Maps to ArgoCD project and tenant namespaces
 
 # Section 1.1: Microservices Configuration (Auto-Discovery)
 # ---------------------------------------------------------------------
