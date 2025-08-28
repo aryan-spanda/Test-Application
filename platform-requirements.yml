@@ -47,26 +47,52 @@ container:
   organization: "aryanpola"
   image: "sample-application"
 
-# Section 2: Target Environments
+# Section 2.1: Target Environments
 # ---------------------------------------------------------------------
 environments:
   - dev
   - staging
   - production
 
-# Section 2.1: GitOps Configuration
+# Section 2.2: GitOps Configuration
 # ---------------------------------------------------------------------
 gitops:
   targetBranch: "testing"
   tagPattern: "^testing-[0-9a-f]{7,8}$"
   updateStrategy: "newest-build"
 
-# Section 2.2: Container Configuration
+# Section 2.3: CI/CD Configuration
 # ---------------------------------------------------------------------
-container:
-  registry: "docker.io"
-  organization: "aryanpola"
-  image: "sample-application"
+cicd:
+  # Docker registry configuration
+  registry_host: "docker.io"                    # Docker registry URL
+  image_namespace: "aryanpola"                   # Organization/username for images
+  
+  # Source code configuration  
+  source_directory: "src/"                       # Where to find services (default: src/)
+  
+  # Deployment configuration
+  deployment_branches:                           # Which branches trigger deployment
+    - "main"
+    - "testing" 
+    - "staging"
+  
+  # Registry authentication (reference to secrets)
+  registry_credentials:
+    username_secret: "DOCKERHUB_USERNAME"        # GitHub secret name for registry username
+    password_secret: "DOCKERHUB_TOKEN"           # GitHub secret name for registry password
+  
+  # Image tagging strategy
+  tagging_strategy:
+    type: "sha-based"                            # Options: sha-based, semantic, date-based
+    format: "{service}-{sha}"                    # Tag format template
+    include_latest: false                        # Whether to also tag as 'latest'
+  
+  # Environment mapping (branch to environment)
+  environment_mapping:
+    main: "production"
+    testing: "staging" 
+    develop: "dev"
 
 # Section 3: Platform Module Requirements
 # ---------------------------------------------------------------------

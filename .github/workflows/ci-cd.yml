@@ -1,22 +1,94 @@
 # Universal CI/CD Workflow Template for Microservices
-# This template dynamically builds all microservices found in src/ directory
-# Works for applications with any number of microservices (2, 3, 4, etc.)
+# This template dynamically reads configuration from platform-requirements.yml
+# Works for applications with any number of microservices and any configuration
 
 name: Build and Deploy Microservices
 
 on:
   push:
-    branches: [ main, develop, testing ]
+    branches: [ main, develop, testing, staging ]  # Will be filtered by platform-requirements.yml
   pull_request:
     branches: [ main ]
 
 env:
+  # Default values - will be overridden by platform-requirements.yml
   REGISTRY: docker.io
-  IMAGE_NAME: aryanpola/sample-application
+  IMAGE_NAMESPACE: ""
+  SOURCE_DIRECTORY: src/
+  CONFIG_FILE: platform-requirements.yml
 
 jobs:
-  # Job 1: Discover microservices dynamically
+  # Job 1: Read configuration from platform-requirements.yml
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      registry_host: ${{ steps.read-config.outputs.registry_host }}
+      image_namespace: ${{ steps.read-config.outputs.image_namespace }}
+      source_directory: ${{ steps.read-config.outputs.source_directory }}
+      deployment_branches: ${{ steps.read-config.outputs.deployment_branches }}
+      registry_username_secret: ${{ steps.read-config.outputs.registry_username_secret }}
+      registry_password_secret: ${{ steps.read-config.outputs.registry_password_secret }}
+      tagging_format: ${{ steps.read-config.outputs.tagging_format }}
+      should_deploy: ${{ steps.check-deployment.outputs.should_deploy }}
+      target_environment: ${{ steps.check-deployment.outputs.target_environment }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install yq
+      run: |
+        sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        sudo chmod +x /usr/local/bin/yq
+        
+    - name: Read platform requirements
+      id: read-config
+      run: |
+        # Read CI/CD configuration from platform-requirements.yml
+        registry_host=$(yq e '.cicd.registry_host // "docker.io"' $CONFIG_FILE)
+        image_namespace=$(yq e '.cicd.image_namespace // env(GITHUB_REPOSITORY_OWNER)' $CONFIG_FILE)
+        source_directory=$(yq e '.cicd.source_directory // "src/"' $CONFIG_FILE)
+        deployment_branches=$(yq e '.cicd.deployment_branches | @json' $CONFIG_FILE)
+        registry_username_secret=$(yq e '.cicd.registry_credentials.username_secret // "DOCKERHUB_USERNAME"' $CONFIG_FILE)
+        registry_password_secret=$(yq e '.cicd.registry_credentials.password_secret // "DOCKERHUB_TOKEN"' $CONFIG_FILE)
+        tagging_format=$(yq e '.cicd.tagging_strategy.format // "{service}-{sha}"' $CONFIG_FILE)
+        
+        echo "registry_host=$registry_host" >> $GITHUB_OUTPUT
+        echo "image_namespace=$image_namespace" >> $GITHUB_OUTPUT
+        echo "source_directory=$source_directory" >> $GITHUB_OUTPUT
+        echo "deployment_branches=$deployment_branches" >> $GITHUB_OUTPUT
+        echo "registry_username_secret=$registry_username_secret" >> $GITHUB_OUTPUT
+        echo "registry_password_secret=$registry_password_secret" >> $GITHUB_OUTPUT
+        echo "tagging_format=$tagging_format" >> $GITHUB_OUTPUT
+        
+        echo "Configuration loaded:"
+        echo "  Registry: $registry_host"
+        echo "  Namespace: $image_namespace"
+        echo "  Source Dir: $source_directory"
+        echo "  Deployment Branches: $deployment_branches"
+        
+    - name: Check deployment conditions
+      id: check-deployment
+      run: |
+        # Check if current branch should trigger deployment
+        current_branch=${GITHUB_REF#refs/heads/}
+        deployment_branches='${{ steps.read-config.outputs.deployment_branches }}'
+        
+        should_deploy="false"
+        target_environment="none"
+        
+        if echo "$deployment_branches" | jq -r '.[]' | grep -q "^$current_branch$"; then
+          should_deploy="true"
+          # Get environment mapping
+          target_environment=$(yq e ".cicd.environment_mapping.\"$current_branch\" // \"$current_branch\"" $CONFIG_FILE)
+        fi
+        
+        echo "should_deploy=$should_deploy" >> $GITHUB_OUTPUT
+        echo "target_environment=$target_environment" >> $GITHUB_OUTPUT
+        echo "Branch '$current_branch' -> Deploy: $should_deploy, Environment: $target_environment"
+
+  # Job 2: Discover microservices dynamically
   discover:
+    needs: config
     runs-on: ubuntu-latest
     outputs:
       services: ${{ steps.find-services.outputs.services }}
@@ -27,14 +99,15 @@ jobs:
     - name: Find microservices
       id: find-services
       run: |
-        # Find all directories in src/ that contain a Dockerfile
-        services=$(find src/ -name "Dockerfile" -exec dirname {} \; | sed 's|src/||' | jq -R -s -c 'split("\n")[:-1]')
+        source_dir="${{ needs.config.outputs.source_directory }}"
+        # Find all directories in source directory that contain a Dockerfile
+        services=$(find "$source_dir" -name "Dockerfile" -exec dirname {} \; | sed "s|$source_dir||" | sed 's|^/||' | jq -R -s -c 'split("\n")[:-1]')
         echo "services=$services" >> $GITHUB_OUTPUT
-        echo "Found services: $services"
+        echo "Found services in '$source_dir': $services"
 
-  # Job 2: Build all discovered microservices
+  # Job 3: Build all discovered microservices
   build:
-    needs: discover
+    needs: [config, discover]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -47,49 +120,94 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       
-    - name: Log in to Docker Hub
+    - name: Log in to Docker Registry
       uses: docker/login-action@v3
       with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        registry: ${{ needs.config.outputs.registry_host }}
+        username: ${{ secrets[needs.config.outputs.registry_username_secret] }}
+        password: ${{ secrets[needs.config.outputs.registry_password_secret] }}
+    
+    - name: Generate image tag
+      id: tag
+      run: |
+        # Use tagging format from platform-requirements.yml
+        tag_format="${{ needs.config.outputs.tagging_format }}"
+        service="${{ matrix.service }}"
+        sha="${{ github.sha }}"
+        
+        # Replace placeholders in tag format
+        image_tag=$(echo "$tag_format" | sed "s/{service}/$service/g" | sed "s/{sha}/${sha:0:8}/g")
+        full_image="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}:$image_tag"
+        
+        echo "image_tag=$image_tag" >> $GITHUB_OUTPUT
+        echo "full_image=$full_image" >> $GITHUB_OUTPUT
+        echo "Generated tag for $service: $image_tag"
+        echo "Full image: $full_image"
     
     # Build and push each microservice
     - name: Build and push ${{ matrix.service }} image
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ./src/${{ matrix.service }}/Dockerfile
+        file: ./${{ needs.config.outputs.source_directory }}${{ matrix.service }}/Dockerfile
         push: true
-        tags: |
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.service }}-${{ github.sha }}
+        tags: ${{ steps.tag.outputs.full_image }}
         cache-from: type=gha,scope=${{ matrix.service }}
         cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-  # Job 3: Update deployment manifests (optional)
+  # Job 4: Update deployment manifests (conditional)
   deploy:
-    needs: [discover, build]
+    needs: [config, discover, build]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/testing' || github.ref == 'refs/heads/staging'
+    if: needs.config.outputs.should_deploy == 'true'
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Install yq
+      run: |
+        sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        sudo chmod +x /usr/local/bin/yq
+        
     - name: Update deployment manifests
       run: |
-        echo "Built images for services: ${{ needs.discover.outputs.services }}"
-        # Example: Update Helm values or trigger ArgoCD
+        echo "🚀 Deploying to environment: ${{ needs.config.outputs.target_environment }}"
+        echo "📦 Built images for services: ${{ needs.discover.outputs.services }}"
+        
+        # Read application and tenant information
+        app_name=$(yq e '.app.name' platform-requirements.yml)
+        tenant_name=$(yq e '.app.tenant' platform-requirements.yml)
+        
+        echo "Application: $app_name"
+        echo "Tenant: $tenant_name"
+        
+        # Generate image information for each service
         for service in $(echo '${{ needs.discover.outputs.services }}' | jq -r '.[]'); do
-          echo "Service: $service"
-          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${service}-${{ github.sha }}"
+          # Recreate the tag format
+          tag_format="${{ needs.config.outputs.tagging_format }}"
+          sha="${{ github.sha }}"
+          image_tag=$(echo "$tag_format" | sed "s/{service}/$service/g" | sed "s/{sha}/${sha:0:8}/g")
+          full_image="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}:$image_tag"
+          
+          echo "📋 Service: $service"
+          echo "   Image: $full_image"
+          echo "   Environment: ${{ needs.config.outputs.target_environment }}"
+          echo "   Tenant: $tenant_name"
           
           # Add your deployment logic here:
           # - Update Helm values files
           # - Trigger ArgoCD sync
           # - Update Kubernetes manifests
           # - Send webhook to deployment system
+          # - Update config repo with new image tags
         done
+        
+    - name: Deployment summary
+      run: |
+        echo "✅ Deployment completed successfully!"
+        echo "🎯 Target environment: ${{ needs.config.outputs.target_environment }}"
+        echo "🏷️ Services deployed: ${{ needs.discover.outputs.services }}"
         
 # ============================================================================
 # Templates for Other CI/CD Platforms
