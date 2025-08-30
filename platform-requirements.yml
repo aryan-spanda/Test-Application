@@ -130,6 +130,33 @@ modules:
         admin_user: "test-app-admin"
         custom_config: "test-application-specific"
   
+  - name: "realtime-bi-baremetal"
+    version: "1.0.0"
+    description: "Real-time BI stack (ClickHouse, Real-time Superset)"
+    values:
+      # Real-time analytics configuration
+      clickhouse:
+        cluster_name: "test-app-realtime"
+        tenant_specific: true
+      superset:
+        realtime_dashboards: true
+        
+  - name: "data-lake-baremetal"
+    version: "1.0.0"
+    description: "Complete data lake platform (MinIO, Kafka, Spark, NiFi)"
+    values:
+      # Data lake configuration
+      minio:
+        tenant_bucket: "test-application-2-data"
+        access_mode: "tenant-isolated"
+      kafka:
+        topics_prefix: "test-app-2"
+      spark:
+        driver_memory: "2g"
+        executor_memory: "4g"
+      nifi:
+        flow_templates: "basic-etl"
+        
   - name: "security-vault" 
     version: "1.2.0"
     description: "HashiCorp Vault secret management"
@@ -151,6 +178,8 @@ modules:
         custom_dashboards:
           - "test-application-metrics"
           - "test-application-business-kpis"
+          - "data-lake-monitoring"
+          - "realtime-bi-metrics"
 
 # =====================================================================
 # NOTE: Application runtime configuration (replicas, image tags, CPU,
