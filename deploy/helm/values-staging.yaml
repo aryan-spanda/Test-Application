@@ -8,6 +8,15 @@ app:
 image:
   pullPolicy: IfNotPresent
 
+# Image tags (managed by ArgoCD Image Updater)
+backend:
+  image:
+    tag: "backend-testing-placeholder"
+
+frontend:
+  image:
+    tag: "frontend-testing-placeholder"
+
 ingress:
   enabled: true
   className: "nginx"
