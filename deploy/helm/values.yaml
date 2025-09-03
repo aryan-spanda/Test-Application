@@ -81,7 +81,7 @@ securityContext:
   capabilities:
     drop:
     - ALL
-  readOnlyRootFilesystem: true
+  readOnlyRootFilesystem: false  # Allow writes for NGINX
   runAsNonRoot: true
   runAsUser: 1001
 service:
