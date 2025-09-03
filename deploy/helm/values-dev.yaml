@@ -5,6 +5,16 @@ replicaCount: 1
 app:
   deploymentMode: microservices
 
+# Frontend service configuration (NGINX + React)
+frontend:
+  image:
+    tag: "frontend-cd0debf0"  # managed by ArgoCD Image Updater
+
+# Backend service configuration (Node.js API)
+backend:
+  image:
+    tag: "backend-ec7c88370910b46720bac3ffaf59d2b6802640b0"  # managed by ArgoCD Image Updater
+
 image:
   # tag: managed by ArgoCD Image Updater via Helm parameters.
   pullPolicy: Always
