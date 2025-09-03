@@ -1,14 +1,23 @@
-# Universal CI/CD Workflow Template for Microservices
+# Universal CI/CD Workflow Template for Educational Chatbot Microservices
 # This template dynamically reads configuration from platform-requirements.yml
 # Works for applications with any number of microservices and any configuration
+# Optimized for testing branch deployment
 
-name: Build and Deploy Microservices
+name: Build and Deploy Educational Chatbot (Testing Branch)
 
 on:
   push:
-    branches: [ main, develop, testing, staging ]  # Will be filtered by platform-requirements.yml
+    branches: [ testing, develop, staging ]  # Prioritize testing branch
   pull_request:
-    branches: [ main ]
+    branches: [ testing ]  # PR target changed to testing
+
+# Add permissions for the GITHUB_TOKEN
+permissions:
+  contents: write          # Allow writing to repository (for updating Helm values)
+  packages: write          # Allow pushing to container registry
+  security-events: write   # Allow uploading security scan results
+  actions: read           # Allow reading workflow artifacts
+  checks: write           # Allow writing check results
 
 env:
   # Default values - will be overridden by platform-requirements.yml
@@ -47,10 +56,10 @@ jobs:
         registry_host=$(yq e '.cicd.registry_host // "docker.io"' $CONFIG_FILE)
         image_namespace=$(yq e '.cicd.image_namespace // env(GITHUB_REPOSITORY_OWNER)' $CONFIG_FILE)
         source_directory=$(yq e '.cicd.source_directory // "src/"' $CONFIG_FILE)
-        deployment_branches=$(yq e '.cicd.deployment_branches | @json' $CONFIG_FILE)
+        deployment_branches=$(yq e '.cicd.deployment_branches // ["testing", "staging"]' $CONFIG_FILE | yq e '. | @json' -)
         registry_username_secret=$(yq e '.cicd.registry_credentials.username_secret // "DOCKERHUB_USERNAME"' $CONFIG_FILE)
         registry_password_secret=$(yq e '.cicd.registry_credentials.password_secret // "DOCKERHUB_TOKEN"' $CONFIG_FILE)
-        tagging_format=$(yq e '.cicd.tagging_strategy.format // "{service}-{sha}"' $CONFIG_FILE)
+        tagging_format=$(yq e '.cicd.tagging_strategy.format // "{service}-{branch}-{sha}"' $CONFIG_FILE)
         
         echo "registry_host=$registry_host" >> $GITHUB_OUTPUT
         echo "image_namespace=$image_namespace" >> $GITHUB_OUTPUT
@@ -65,6 +74,7 @@ jobs:
         echo "  Namespace: $image_namespace"
         echo "  Source Dir: $source_directory"
         echo "  Deployment Branches: $deployment_branches"
+        echo "  Tagging Format: $tagging_format"
         
     - name: Check deployment conditions
       id: check-deployment
@@ -76,7 +86,11 @@ jobs:
         should_deploy="false"
         target_environment="none"
         
-        if echo "$deployment_branches" | jq -r '.[]' | grep -q "^$current_branch$"; then
+        # For testing branch, always deploy to dev environment
+        if [[ "$current_branch" == "testing" ]]; then
+          should_deploy="true"
+          target_environment="dev"
+        elif echo "$deployment_branches" | jq -r '.[]' | grep -q "^$current_branch$"; then
           should_deploy="true"
           # Get environment mapping
           target_environment=$(yq e ".cicd.environment_mapping.\"$current_branch\" // \"$current_branch\"" $CONFIG_FILE)
@@ -100,271 +114,302 @@ jobs:
       id: find-services
       run: |
         source_dir="${{ needs.config.outputs.source_directory }}"
-        # Find all directories in source directory that contain a Dockerfile
-        services=$(find "$source_dir" -name "Dockerfile" -exec dirname {} \; | sed "s|$source_dir||" | sed 's|^/||' | jq -R -s -c 'split("\n")[:-1]')
-        echo "services=$services" >> $GITHUB_OUTPUT
-        echo "Found services in '$source_dir': $services"
+        echo "Scanning for Dockerfiles in: $source_dir"
+        
+        services="[]"
+        
+        # Find all directories with Dockerfiles in the source directory
+        for dockerfile in $(find "$source_dir" -name "Dockerfile" -type f); do
+          # Get the directory name (service name)
+          service_dir=$(dirname "$dockerfile")
+          service_name=$(basename "$service_dir")
+          
+          echo "Found service: $service_name (Dockerfile: $dockerfile)"
+          
+          # Build the service JSON object with repository root as context
+          service_json=$(jq -n \
+            --arg name "$service_name" \
+            --arg dockerfile "./$dockerfile" \
+            --arg context "." \
+            '{name: $name, dockerfile: $dockerfile, context: $context}')
+          
+          # Add to services array
+          services=$(echo "$services" | jq --argjson service "$service_json" '. + [$service]')
+        done
+        
+        # Compact the JSON to avoid formatting issues with newlines
+        services_compact=$(echo "$services" | jq -c .)
+        
+        # Use delimiter for multiline output
+        {
+          echo "services<<EOF"
+          echo "$services_compact"
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
+        
+        echo "Discovered services:"
+        echo "$services" | jq .
 
-  # Job 3: Build all discovered microservices
+  # Job 3: Build and push Docker images for each microservice
   build:
     needs: [config, discover]
     runs-on: ubuntu-latest
+    if: needs.discover.outputs.services != '[]'
     strategy:
       matrix:
         service: ${{ fromJson(needs.discover.outputs.services) }}
-    
     steps:
+    - name: Debug matrix configuration
+      run: |
+        echo "Service Name: ${{ matrix.service.name }}"
+        echo "Dockerfile: ${{ matrix.service.dockerfile }}"
+        echo "Context: ${{ matrix.service.context }}"
+        echo "Current Branch: ${{ github.ref_name }}"
+        echo "Services JSON: ${{ needs.discover.outputs.services }}"
+        
     - name: Checkout code
       uses: actions/checkout@v4
       
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       
-    - name: Log in to Docker Registry
+    - name: Debug registry configuration
+      run: |
+        echo "Registry host: ${{ needs.config.outputs.registry_host }}"
+        echo "Image namespace: ${{ needs.config.outputs.image_namespace }}"
+        echo "Username secret name: ${{ needs.config.outputs.registry_username_secret }}"
+        echo "Password secret name: ${{ needs.config.outputs.registry_password_secret }}"
+        
+    - name: Log in to container registry
       uses: docker/login-action@v3
       with:
         registry: ${{ needs.config.outputs.registry_host }}
         username: ${{ secrets[needs.config.outputs.registry_username_secret] }}
         password: ${{ secrets[needs.config.outputs.registry_password_secret] }}
-    
-    - name: Generate image tag
-      id: tag
+        
+    - name: Verify Docker login
       run: |
-        # Use tagging format from platform-requirements.yml
-        tag_format="${{ needs.config.outputs.tagging_format }}"
-        service="${{ matrix.service }}"
-        sha="${{ github.sha }}"
+        echo "Testing Docker Hub connection..."
+        docker info
+        docker version
         
-        # Replace placeholders in tag format
-        image_tag=$(echo "$tag_format" | sed "s/{service}/$service/g" | sed "s/{sha}/${sha:0:8}/g")
-        full_image="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}:$image_tag"
-        
-        echo "image_tag=$image_tag" >> $GITHUB_OUTPUT
-        echo "full_image=$full_image" >> $GITHUB_OUTPUT
-        echo "Generated tag for $service: $image_tag"
-        echo "Full image: $full_image"
-    
-    # Build and push each microservice
-    - name: Build and push ${{ matrix.service }} image
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        # Set a single, static repository name
+        images: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot
+        # Add the service name and branch as prefix to all tags (optimized for testing branch)
+        tags: |
+          type=raw,value=${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}
+          type=raw,value=${{ matrix.service.name }}-${{ github.ref_name }}-latest
+          
+    - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
-        context: .
-        file: ./${{ needs.config.outputs.source_directory }}${{ matrix.service }}/Dockerfile
+        context: ${{ matrix.service.context }}
+        file: ${{ matrix.service.dockerfile }}
         push: true
-        tags: ${{ steps.tag.outputs.full_image }}
-        cache-from: type=gha,scope=${{ matrix.service }}
-        cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+        outputs: type=registry
+        
+    - name: Debug build outputs
+      run: |
+        echo "Build completed for service: ${{ matrix.service.name }}"
+        echo "Image tags: ${{ steps.meta.outputs.tags }}"
+        echo "Image digest: ${{ steps.meta.outputs.digest }}"
+        echo "Expected image: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot"
+        echo "Service-specific tags: ${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}, ${{ matrix.service.name }}-${{ github.ref_name }}-latest"
+        
+    - name: Output image details
+      run: |
+        echo "Built and pushed image for service: ${{ matrix.service.name }}"
+        echo "Image tags: ${{ steps.meta.outputs.tags }}"
+        echo "Image digest: ${{ steps.meta.outputs.digest }}"
 
-  # Job 4: Update deployment manifests (conditional)
-  deploy:
+  # Job 4: Security scanning
+  security:
     needs: [config, discover, build]
     runs-on: ubuntu-latest
-    if: needs.config.outputs.should_deploy == 'true'
-    
+    if: needs.discover.outputs.services != '[]'
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.discover.outputs.services) }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Wait for image to be available
+      run: |
+        echo "Waiting 30 seconds for image to be available on DockerHub..."
+        sleep 30
+        
+    - name: Verify image exists before scanning
+      id: check-image
+      continue-on-error: true
+      run: |
+        image_name="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
+        echo "Checking if image exists: $image_name"
+        
+        # Try to pull the image manifest to verify it exists
+        if docker manifest inspect "$image_name" > /dev/null 2>&1; then
+          echo "image_exists=true" >> $GITHUB_OUTPUT
+          echo "✅ Image found: $image_name"
+        else
+          echo "image_exists=false" >> $GITHUB_OUTPUT
+          echo "❌ Image not found: $image_name"
+        fi
+        
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      if: steps.check-image.outputs.image_exists == 'true'
+      continue-on-error: true
+      with:
+        image-ref: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results-${{ matrix.service.name }}.sarif'
+        timeout: '10m'  # Increase timeout to 10 minutes
+        scanners: 'vuln'  # Only scan for vulnerabilities, skip secrets to speed up
+        
+    - name: Fallback Quick Trivy scan
+      if: ${{ steps.check-image.outputs.image_exists == 'true' && failure() }}
+      continue-on-error: true
+      run: |
+        echo "Full scan failed, attempting quick vulnerability-only scan..."
+        IMAGE_NAME="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --timeout 5m --scanners vuln --severity HIGH,CRITICAL "$IMAGE_NAME" || echo "Quick scan also failed"
+        
+    - name: Check if SARIF file was created
+      id: check-sarif
+      run: |
+        if [ -f "trivy-results-${{ matrix.service.name }}.sarif" ]; then
+          echo "sarif_exists=true" >> $GITHUB_OUTPUT
+          echo "✅ SARIF file created successfully"
+        else
+          echo "sarif_exists=false" >> $GITHUB_OUTPUT
+          echo "❌ SARIF file not found (scan may have failed or timed out)"
+        fi
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: steps.check-sarif.outputs.sarif_exists == 'true'
+      with:
+        sarif_file: 'trivy-results-${{ matrix.service.name }}.sarif'
+
+  # Job 5: Update Helm values for ArgoCD Image Updater (Testing Branch Integration)
+  update-helm-values:
+    needs: [config, discover, build, security]
+    runs-on: ubuntu-latest
+    if: needs.config.outputs.should_deploy == 'true' && github.ref_name == 'testing'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
     - name: Install yq
       run: |
         sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
         sudo chmod +x /usr/local/bin/yq
         
-    - name: Update deployment manifests
+    - name: Update Helm values for testing environment
       run: |
-        echo "🚀 Deploying to environment: ${{ needs.config.outputs.target_environment }}"
-        echo "📦 Built images for services: ${{ needs.discover.outputs.services }}"
+        echo "🔄 Updating Helm values for testing branch deployment..."
         
-        # Read application and tenant information
-        app_name=$(yq e '.app.name' platform-requirements.yml)
-        tenant_name=$(yq e '.app.tenant' platform-requirements.yml)
+        # Check if Helm values file exists
+        HELM_VALUES_FILE="deploy/helm/values-dev.yaml"
+        if [[ ! -f "$HELM_VALUES_FILE" ]]; then
+          echo "Creating $HELM_VALUES_FILE..."
+          mkdir -p deploy/helm
+          echo "# Auto-generated values for testing branch" > "$HELM_VALUES_FILE"
+        fi
         
-        echo "Application: $app_name"
-        echo "Tenant: $tenant_name"
-        
-        # Generate image information for each service
-        for service in $(echo '${{ needs.discover.outputs.services }}' | jq -r '.[]'); do
-          # Recreate the tag format
-          tag_format="${{ needs.config.outputs.tagging_format }}"
-          sha="${{ github.sha }}"
-          image_tag=$(echo "$tag_format" | sed "s/{service}/$service/g" | sed "s/{sha}/${sha:0:8}/g")
-          full_image="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}:$image_tag"
+        # Update image tags for each discovered service
+        echo '${{ needs.discover.outputs.services }}' | jq -r '.[].name' | while read service; do
+          echo "Updating $service image tag..."
           
-          echo "📋 Service: $service"
-          echo "   Image: $full_image"
-          echo "   Environment: ${{ needs.config.outputs.target_environment }}"
-          echo "   Tenant: $tenant_name"
+          # Create the image tag for testing branch
+          image_tag="${service}-testing-${{ github.sha }}"
+          image_repo="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot"
           
-          # Add your deployment logic here:
-          # - Update Helm values files
-          # - Trigger ArgoCD sync
-          # - Update Kubernetes manifests
-          # - Send webhook to deployment system
-          # - Update config repo with new image tags
+          # Update or add the service configuration in Helm values
+          yq e ".${service}.image.repository = \"$image_repo\"" -i "$HELM_VALUES_FILE"
+          yq e ".${service}.image.tag = \"$image_tag\"" -i "$HELM_VALUES_FILE"
+          
+          echo "Updated $service -> $image_repo:$image_tag"
         done
         
-    - name: Deployment summary
+    - name: Commit updated Helm values
       run: |
-        echo "✅ Deployment completed successfully!"
-        echo "🎯 Target environment: ${{ needs.config.outputs.target_environment }}"
-        echo "🏷️ Services deployed: ${{ needs.discover.outputs.services }}"
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
         
-# ============================================================================
-# Templates for Other CI/CD Platforms
-# ============================================================================
+        if git diff --quiet deploy/helm/values-dev.yaml; then
+          echo "No changes to commit"
+        else
+          git add deploy/helm/values-dev.yaml
+          git commit -m "build: update image tags for testing branch - ${{ github.sha }}"
+          git push
+          echo "✅ Committed updated Helm values for testing branch"
+        fi
 
-# GitLab CI (.gitlab-ci.yml) - Dynamic microservices build:
-# 
-# stages:
-#   - discover
-#   - build
-#   - deploy
-# 
-# discover-services:
-#   stage: discover
-#   script:
-#     - services=$(find src/ -name "Dockerfile" -exec dirname {} \; | sed 's|src/||')
-#     - echo "$services" | tee services.txt
-#   artifacts:
-#     paths:
-#       - services.txt
-# 
-# build-microservices:
-#   stage: build
-#   parallel:
-#     matrix:
-#       - SERVICE: [frontend, backend, api, worker]  # or read from services.txt
-#   script:
-#     - docker build -f src/$SERVICE/Dockerfile -t $CI_REGISTRY_IMAGE:$SERVICE-$CI_COMMIT_SHA .
-#     - docker push $CI_REGISTRY_IMAGE:$SERVICE-$CI_COMMIT_SHA
-#   rules:
-#     - if: -f "src/$SERVICE/Dockerfile"
+  # NOTE: ArgoCD Image Updater will also handle deployment automation
+  # Images are built and pushed to Docker registry, ArgoCD Image Updater will:
+  # 1. Detect new SHA-based image tags for testing branch
+  # 2. Update Helm values automatically
+  # 3. Commit changes to repository
+  # 4. Trigger ArgoCD sync
 
-# Jenkins Pipeline (Jenkinsfile) - Dynamic microservices build:
-#
-# pipeline {
-#     agent any
-#     stages {
-#         stage('Discover Services') {
-#             steps {
-#                 script {
-#                     def services = sh(
-#                         script: "find src/ -name 'Dockerfile' -exec dirname {} \\; | sed 's|src/||'",
-#                         returnStdout: true
-#                     ).trim().split('\n')
-#                     env.SERVICES = services.join(',')
-#                     echo "Found services: ${env.SERVICES}"
-#                 }
-#             }
-#         }
-#         stage('Build Services') {
-#             steps {
-#                 script {
-#                     def services = env.SERVICES.split(',')
-#                     def builds = [:]
-#                     
-#                     services.each { service ->
-#                         builds[service] = {
-#                             node {
-#                                 def image = docker.build("aryanpola/sample-application:${service}-${env.BUILD_ID}", "-f src/${service}/Dockerfile .")
-#                                 docker.withRegistry('https://docker.io', 'docker-hub-credentials') {
-#                                     image.push("${service}-${env.BUILD_ID}")
-#                                     image.push("${service}-latest")
-#                                 }
-#                             }
-#                         }
-#                     }
-#                     parallel builds
-#                 }
-#             }
-#         }
-#     }
-# }
-
-# Azure DevOps Pipeline (azure-pipelines.yml) - Dynamic microservices:
-#
-# trigger:
-# - main
-# - develop
-# 
-# pool:
-#   vmImage: 'ubuntu-latest'
-# 
-# stages:
-# - stage: Discover
-#   jobs:
-#   - job: FindServices
-#     steps:
-#     - script: |
-#         services=$(find src/ -name "Dockerfile" -exec dirname {} \; | sed 's|src/||' | tr '\n' ',' | sed 's/,$//')
-#         echo "##vso[task.setvariable variable=services;isOutput=true]$services"
-#       name: discover
-# 
-# - stage: Build
-#   dependsOn: Discover
-#   variables:
-#     services: $[ stageDependencies.Discover.FindServices.outputs['discover.services'] ]
-#   jobs:
-#   - job: BuildImages
-#     strategy:
-#       matrix:
-#         ${{ each service in split(variables.services, ',') }}:
-#           ${{ service }}:
-#             serviceName: ${{ service }}
-#     steps:
-#     - task: Docker@2
-#       inputs:
-#         command: 'buildAndPush'
-#         repository: 'aryanpola/sample-application'
-#         dockerfile: 'src/$(serviceName)/Dockerfile'
-#         tags: |
-#           $(serviceName)-$(Build.BuildId)
-#           $(serviceName)-latest
+  # Job 6: Notification and summary
+  notify:
+    needs: [config, discover, build, security, update-helm-values]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Build Summary
+      run: |
+        echo "## 🤖 Educational Chatbot CI/CD Summary (Testing Branch)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
         
-# For other CI/CD platforms:
-# 
-# GitLab CI (.gitlab-ci.yml):
-# 
-# stages:
-#   - build
-#   - deploy
-# 
-# build-frontend:
-#   stage: build
-#   script:
-#     - docker build -f src/frontend/Dockerfile -t $CI_REGISTRY_IMAGE:frontend-$CI_COMMIT_SHA .
-#     - docker push $CI_REGISTRY_IMAGE:frontend-$CI_COMMIT_SHA
-# 
-# build-backend:
-#   stage: build  
-#   script:
-#     - docker build -f src/backend/Dockerfile -t $CI_REGISTRY_IMAGE:backend-$CI_COMMIT_SHA .
-#     - docker push $CI_REGISTRY_IMAGE:backend-$CI_COMMIT_SHA
-#
-# Jenkins Pipeline (Jenkinsfile):
-#
-# pipeline {
-#     agent any
-#     stages {
-#         stage('Build Frontend') {
-#             steps {
-#                 script {
-#                     docker.build("aryanpola/sample-application:frontend-${env.BUILD_ID}", "-f src/frontend/Dockerfile .")
-#                     docker.withRegistry('https://docker.io', 'docker-hub-credentials') {
-#                         docker.image("aryanpola/sample-application:frontend-${env.BUILD_ID}").push()
-#                     }
-#                 }
-#             }
-#         }
-#         stage('Build Backend') {
-#             steps {
-#                 script {
-#                     docker.build("aryanpola/sample-application:backend-${env.BUILD_ID}", "-f src/backend/Dockerfile .")
-#                     docker.withRegistry('https://docker.io', 'docker-hub-credentials') {
-#                         docker.image("aryanpola/sample-application:backend-${env.BUILD_ID}").push()
-#                     }
-#                 }
-#             }
-#         }
-#     }
-# }
+        echo "### ✅ Build & Push Status" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }} (Testing Branch Optimized)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Images**: Built and pushed to Docker registry" >> $GITHUB_STEP_SUMMARY
+        echo "- **Deployment**: ArgoCD Image Updater will auto-detect and deploy" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: ${{ needs.config.outputs.target_environment }}" >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔨 Built Services" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.discover.outputs.services }}" != "[]" ]; then
+          echo '${{ needs.discover.outputs.services }}' | jq -r '.[] | "- **" + .name + "** (from `" + .dockerfile + "`)"' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "No services found to build." >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Job Status" >> $GITHUB_STEP_SUMMARY
+        echo "- **Config**: ${{ needs.config.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Discovery**: ${{ needs.discover.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build**: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Security**: ${{ needs.security.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Helm Update**: ${{ needs.update-helm-values.result }}" >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🎯 Testing Branch Features" >> $GITHUB_STEP_SUMMARY
+        echo "- **SHA-based tags**: Images tagged with \`service-testing-sha\` format" >> $GITHUB_STEP_SUMMARY
+        echo "- **Auto Helm update**: Values files updated automatically for testing branch" >> $GITHUB_STEP_SUMMARY
+        echo "- **ArgoCD Integration**: Optimized for ArgoCD Image Updater detection" >> $GITHUB_STEP_SUMMARY
+        echo "- **Security scanning**: Trivy vulnerability scanning included" >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 Next Steps" >> $GITHUB_STEP_SUMMARY
+        echo "ArgoCD Image Updater will automatically:" >> $GITHUB_STEP_SUMMARY
+        echo "1. Detect new testing-branch SHA-based image tags" >> $GITHUB_STEP_SUMMARY
+        echo "2. Update Helm values with new tags" >> $GITHUB_STEP_SUMMARY
+        echo "3. Commit changes to repository" >> $GITHUB_STEP_SUMMARY
+        echo "4. Trigger ArgoCD application sync for dev environment" >> $GITHUB_STEP_SUMMARY

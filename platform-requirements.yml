@@ -54,45 +54,45 @@ environments:
   - staging
   - production
 
-# Section 2.2: GitOps Configuration
+# Section 2.2: GitOps Configuration (Testing Branch Optimized)
 # ---------------------------------------------------------------------
 gitops:
   targetBranch: "testing"
-  tagPattern: "^testing-[0-9a-f]{7,8}$"
+  tagPattern: "^testing-[0-9a-f]{40}$"  # Full SHA pattern for testing branch
   updateStrategy: "newest-build"
 
-# Section 2.3: CI/CD Configuration
+# Section 2.3: CI/CD Configuration (Testing Branch Focus)
 # ---------------------------------------------------------------------
 cicd:
   # Docker registry configuration
   registry_host: "docker.io"                    # Docker registry URL
-  image_namespace: "aryanpola/sample-application"  # Full repository name for images
+  image_namespace: "aryanpola/sample-application"                   # Organization name only
   
   # Source code configuration  
   source_directory: "src/"                       # Where to find services (default: src/)
   
-  # Deployment configuration
+  # Deployment configuration (prioritize testing branch)
   deployment_branches:                           # Which branches trigger deployment
-    - "main"
-    - "testing" 
-    - "staging"
+    - "testing"  # Primary development branch
+    - "staging"  # Pre-production testing
+    - "main"     # Legacy/fallback
   
   # Registry authentication (reference to secrets)
   registry_credentials:
     username_secret: "DOCKERHUB_USERNAME"        # GitHub secret name for registry username
     password_secret: "DOCKERHUB_TOKEN"           # GitHub secret name for registry password
   
-  # Image tagging strategy
+  # Image tagging strategy (testing branch optimized)
   tagging_strategy:
-    type: "sha-based"                            # Options: sha-based, semantic, date-based
-    format: "{service}-{sha}"                    # Tag format template
-    include_latest: false                        # Whether to also tag as 'latest'
+    type: "sha-based"                            # SHA-based for ArgoCD Image Updater
+    format: "{service}-{branch}-{sha}"           # Include branch in tag
+    include_latest: true                         # Also tag as 'service-testing-latest'
   
-  # Environment mapping (branch to environment)
+  # Environment mapping (testing branch to dev environment)
   environment_mapping:
-    main: "production"
-    testing: "staging" 
-    develop: "dev"
+    testing: "dev"      # Testing branch deploys to dev environment
+    staging: "staging"  # Staging branch to staging environment
+    main: "production"  # Main branch to production
 
 # Section 3: Platform Module Requirements
 # ---------------------------------------------------------------------
