@@ -1,9 +1,9 @@
-# Universal CI/CD Workflow Template for Educational Chatbot Microservices
+# Universal CI/CD Workflow Template for Microservices
 # This template dynamically reads configuration from platform-requirements.yml
 # Works for applications with any number of microservices and any configuration
 # Optimized for testing branch deployment
 
-name: Build and Deploy Educational Chatbot (Testing Branch)
+name: Build and Deploy Microservices
 
 on:
   push:
@@ -31,6 +31,7 @@ jobs:
   config:
     runs-on: ubuntu-latest
     outputs:
+      app_name: ${{ steps.read-config.outputs.app_name }}
       registry_host: ${{ steps.read-config.outputs.registry_host }}
       image_namespace: ${{ steps.read-config.outputs.image_namespace }}
       image_name: ${{ steps.read-config.outputs.image_name }}
@@ -55,9 +56,10 @@ jobs:
       id: read-config
       run: |
         # Read CI/CD configuration from platform-requirements.yml
+        app_name=$(yq e '.app.name // "sample-application"' $CONFIG_FILE)
         registry_host=$(yq e '.cicd.registry_host // .container.registry // "docker.io"' $CONFIG_FILE)
         image_namespace=$(yq e '.cicd.image_namespace // .container.organization // env(GITHUB_REPOSITORY_OWNER)' $CONFIG_FILE)
-        image_name=$(yq e '.cicd.image_name // .container.image // "sample-application"' $CONFIG_FILE)
+        image_name=$(yq e '.cicd.image_name // .container.image // .app.name // "sample-application"' $CONFIG_FILE)
         # Construct full repository path
         image_repository="$image_namespace/$image_name"
         source_directory=$(yq e '.cicd.source_directory // "src/"' $CONFIG_FILE)
@@ -66,6 +68,7 @@ jobs:
         registry_password_secret=$(yq e '.cicd.registry_credentials.password_secret // "DOCKERHUB_TOKEN"' $CONFIG_FILE)
         tagging_format=$(yq e '.cicd.tagging_strategy.format // "{service}-{branch}-{sha}"' $CONFIG_FILE)
         
+        echo "app_name=$app_name" >> $GITHUB_OUTPUT
         echo "registry_host=$registry_host" >> $GITHUB_OUTPUT
         echo "image_namespace=$image_namespace" >> $GITHUB_OUTPUT
         echo "image_name=$image_name" >> $GITHUB_OUTPUT
@@ -77,6 +80,7 @@ jobs:
         echo "tagging_format=$tagging_format" >> $GITHUB_OUTPUT
         
         echo "Configuration loaded:"
+        echo "  Application: $app_name"
         echo "  Registry: $registry_host"
         echo "  Namespace: $image_namespace"
         echo "  Image Name: $image_name"
@@ -212,6 +216,7 @@ jobs:
         
     - name: Debug build context
       run: |
+        echo "Application: ${{ needs.config.outputs.app_name }}"
         echo "Registry Host: ${{ needs.config.outputs.registry_host }}"
         echo "Image Repository: ${{ needs.config.outputs.image_repository }}"
         echo "Service Name: ${{ matrix.service.name }}"
@@ -240,9 +245,8 @@ jobs:
         
     - name: Debug build outputs
       run: |
-        echo "Build completed for service: ${{ matrix.service.name }}"
-        echo "Image tags: ${{ steps.meta.outputs.tags }}"
-        echo "Image digest: ${{ steps.meta.outputs.digest }}"
+        echo "Build completed for application: ${{ needs.config.outputs.app_name }}"
+        echo "Service: ${{ matrix.service.name }}"
         echo "Expected image: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}"
         echo "Service-specific tags: ${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}, ${{ matrix.service.name }}-${{ github.ref_name }}-latest"
         
