@@ -148,6 +148,25 @@ modules:
         tenant_specific: true
       superset:
         realtime_dashboards: true
+
+  - name: "monitoring-prometheus"
+    version: "1.0.0"
+    description: "Tenant-specific monitoring stack (Prometheus, Grafana, Alertmanager)"
+    values:
+      # Tenant-specific monitoring configuration
+      prometheus:
+        retention: "7d"
+        storage_size: "10Gi"
+        tenant_scope: true
+      grafana:
+        admin_user: "test-app-monitor"
+        tenant_dashboards: true
+        custom_datasources: true
+      alertmanager:
+        tenant_alerts: true
+        notification_channels:
+          - slack: "#test-app-alerts"
+          - email: "alerts@test-application.com"
         
   - name: "data-lake-baremetal"
     version: "1.0.0"
