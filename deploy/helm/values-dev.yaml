@@ -1,40 +1,35 @@
 # Environment-specific values for development
 replicaCount: 1
-
 # Enable microservices deployment mode
 app:
   deploymentMode: microservices
-
 # Frontend service configuration (NGINX + React)
 frontend:
   image:
-    tag: "frontend-cd0debf0"  # managed by ArgoCD Image Updater
-
+    tag: "frontend-testing-cf2f285538cb213febbf6c49b1d268232e7ec237" # managed by ArgoCD Image Updater
+    repository: docker.io/aryanpola/sample-application
 # Backend service configuration (Node.js API)
 backend:
   image:
-    tag: "backend-ec7c88370910b46720bac3ffaf59d2b6802640b0"  # managed by ArgoCD Image Updater
-
+    tag: "backend-testing-cf2f285538cb213febbf6c49b1d268232e7ec237" # managed by ArgoCD Image Updater
+    repository: docker.io/aryanpola/sample-application
 image:
   # tag: managed by ArgoCD Image Updater via Helm parameters.
   pullPolicy: Always
-
 ingress:
   enabled: true
   className: "nginx"
   host: "test-app-dev.aryanpola.xyz"
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    cert-manager.io/cluster-issuer: "letsencrypt-staging"  # Now we can use Let's Encrypt with real domain
+    cert-manager.io/cluster-issuer: "letsencrypt-staging" # Now we can use Let's Encrypt with real domain
   tls:
     - secretName: test-app-dev-tls
       hosts:
         - test-app-dev.aryanpola.xyz
-
 env:
   NODE_ENV: development
   LOG_LEVEL: debug
-
 resources:
   limits:
     cpu: 250m
@@ -42,23 +37,26 @@ resources:
   requests:
     cpu: 50m
     memory: 64Mi
-
 probes:
   liveness:
     initialDelaySeconds: 10
   readiness:
     initialDelaySeconds: 3
-
 # Network Policy - Development Environment
+
 # More permissive for debugging and development
 networkPolicy:
-  enabled: false  # Disabled in dev for easier debugging
+  enabled: false # Disabled in dev for easier debugging
   # When enabled, use these settings:
-  # ingress:
-  #   allowFromIngressController: true
-  #   allowFromMonitoring: true
-  #   allowFromSameNamespace: true  # Allow cross-pod communication for testing
-  # egress:
-  #   allowDNS: true
-  #   allowToInternet: true
-  #   allowHTTP: true  # Allow HTTP for dev APIs
+# ingress:
+#   allowFromIngressController: true
+#   allowFromMonitoring: true
+#   allowFromSameNamespace: true  # Allow cross-pod communication for testing
+
+# egress:
+
+#   allowDNS: true
+
+#   allowToInternet: true
+
+#   allowHTTP: true  # Allow HTTP for dev APIs
