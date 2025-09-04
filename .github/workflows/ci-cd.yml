@@ -33,6 +33,7 @@ jobs:
     outputs:
       registry_host: ${{ steps.read-config.outputs.registry_host }}
       image_namespace: ${{ steps.read-config.outputs.image_namespace }}
+      image_name: ${{ steps.read-config.outputs.image_name }}
       source_directory: ${{ steps.read-config.outputs.source_directory }}
       deployment_branches: ${{ steps.read-config.outputs.deployment_branches }}
       registry_username_secret: ${{ steps.read-config.outputs.registry_username_secret }}
@@ -53,8 +54,9 @@ jobs:
       id: read-config
       run: |
         # Read CI/CD configuration from platform-requirements.yml
-        registry_host=$(yq e '.cicd.registry_host // "docker.io"' $CONFIG_FILE)
-        image_namespace=$(yq e '.cicd.image_namespace // env(GITHUB_REPOSITORY_OWNER)' $CONFIG_FILE)
+        registry_host=$(yq e '.cicd.registry_host // .container.registry // "docker.io"' $CONFIG_FILE)
+        image_namespace=$(yq e '.cicd.image_namespace // .container.organization // env(GITHUB_REPOSITORY_OWNER)' $CONFIG_FILE)
+        image_name=$(yq e '.cicd.image_name // .container.image // "sample-application"' $CONFIG_FILE)
         source_directory=$(yq e '.cicd.source_directory // "src/"' $CONFIG_FILE)
         deployment_branches=$(yq e '.cicd.deployment_branches // ["testing", "staging"]' $CONFIG_FILE | yq e '. | @json' -)
         registry_username_secret=$(yq e '.cicd.registry_credentials.username_secret // "DOCKERHUB_USERNAME"' $CONFIG_FILE)
@@ -63,6 +65,7 @@ jobs:
         
         echo "registry_host=$registry_host" >> $GITHUB_OUTPUT
         echo "image_namespace=$image_namespace" >> $GITHUB_OUTPUT
+        echo "image_name=$image_name" >> $GITHUB_OUTPUT
         echo "source_directory=$source_directory" >> $GITHUB_OUTPUT
         echo "deployment_branches=$deployment_branches" >> $GITHUB_OUTPUT
         echo "registry_username_secret=$registry_username_secret" >> $GITHUB_OUTPUT
@@ -72,6 +75,7 @@ jobs:
         echo "Configuration loaded:"
         echo "  Registry: $registry_host"
         echo "  Namespace: $image_namespace"
+        echo "  Image Name: $image_name"
         echo "  Source Dir: $source_directory"
         echo "  Deployment Branches: $deployment_branches"
         echo "  Tagging Format: $tagging_format"
@@ -165,6 +169,8 @@ jobs:
         echo "Dockerfile: ${{ matrix.service.dockerfile }}"
         echo "Context: ${{ matrix.service.context }}"
         echo "Current Branch: ${{ github.ref_name }}"
+        echo "Git SHA: ${{ github.sha }}"
+        echo "Expected Tags: ${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
         echo "Services JSON: ${{ needs.discover.outputs.services }}"
         
     - name: Checkout code
@@ -197,8 +203,8 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        # Set a single, static repository name
-        images: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot
+        # Set repository name from platform-requirements.yml
+        images: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/${{ needs.config.outputs.image_name }}
         # Add the service name and branch as prefix to all tags (optimized for testing branch)
         tags: |
           type=raw,value=${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}
@@ -222,7 +228,7 @@ jobs:
         echo "Build completed for service: ${{ matrix.service.name }}"
         echo "Image tags: ${{ steps.meta.outputs.tags }}"
         echo "Image digest: ${{ steps.meta.outputs.digest }}"
-        echo "Expected image: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot"
+        echo "Expected image: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/${{ needs.config.outputs.image_name }}"
         echo "Service-specific tags: ${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}, ${{ matrix.service.name }}-${{ github.ref_name }}-latest"
         
     - name: Output image details
@@ -252,7 +258,7 @@ jobs:
       id: check-image
       continue-on-error: true
       run: |
-        image_name="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
+        image_name="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/${{ needs.config.outputs.image_name }}:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
         echo "Checking if image exists: $image_name"
         
         # Try to pull the image manifest to verify it exists
@@ -269,7 +275,7 @@ jobs:
       if: steps.check-image.outputs.image_exists == 'true'
       continue-on-error: true
       with:
-        image-ref: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}
+        image-ref: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/${{ needs.config.outputs.image_name }}:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}
         format: 'sarif'
         output: 'trivy-results-${{ matrix.service.name }}.sarif'
         timeout: '10m'  # Increase timeout to 10 minutes
@@ -280,7 +286,7 @@ jobs:
       continue-on-error: true
       run: |
         echo "Full scan failed, attempting quick vulnerability-only scan..."
-        IMAGE_NAME="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
+        IMAGE_NAME="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/${{ needs.config.outputs.image_name }}:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --timeout 5m --scanners vuln --severity HIGH,CRITICAL "$IMAGE_NAME" || echo "Quick scan also failed"
         
     - name: Check if SARIF file was created
@@ -334,7 +340,7 @@ jobs:
           
           # Create the image tag for testing branch
           image_tag="${service}-testing-${{ github.sha }}"
-          image_repo="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/educational-chatbot"
+          image_repo="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_namespace }}/${{ needs.config.outputs.image_name }}"
           
           # Update or add the service configuration in Helm values
           yq e ".${service}.image.repository = \"$image_repo\"" -i "$HELM_VALUES_FILE"
