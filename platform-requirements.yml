@@ -66,7 +66,8 @@ gitops:
 cicd:
   # Docker registry configuration
   registry_host: "docker.io"                    # Docker registry URL
-  image_namespace: "aryanpola/sample-application"                   # Organization name only
+  image_namespace: "aryanpola"                   # Organization name only
+  image_name: "sample-application"               # Repository/image name only
   
   # Source code configuration  
   source_directory: "src/"                       # Where to find services (default: src/)
@@ -93,6 +94,13 @@ cicd:
     testing: "dev"      # Testing branch deploys to dev environment
     staging: "staging"  # Staging branch to staging environment
     main: "production"  # Main branch to production
+
+# Section 2.4: Container Configuration (Legacy Support)
+# ---------------------------------------------------------------------
+container:
+  registry: "docker.io"
+  organization: "aryanpola"
+  image: "sample-application"
 
 # Section 3: Platform Module Requirements
 # ---------------------------------------------------------------------
