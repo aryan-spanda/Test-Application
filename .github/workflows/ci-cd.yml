@@ -176,7 +176,9 @@ jobs:
         echo "Context: ${{ matrix.service.context }}"
         echo "Current Branch: ${{ github.ref_name }}"
         echo "Git SHA: ${{ github.sha }}"
-        echo "Expected Tags: ${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
+        echo "Full Expected Tags:"
+        echo "  - ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
+        echo "  - ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-latest"
         echo "Services JSON: ${{ needs.discover.outputs.services }}"
         
     - name: Checkout code
@@ -208,27 +210,31 @@ jobs:
         docker info
         docker version
         
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        # Set repository name from platform-requirements.yml  
-        images: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}
-        # Add the service name and branch as prefix to all tags (optimized for testing branch)
-        tags: |
-          type=raw,value=${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}
-          type=raw,value=${{ matrix.service.name }}-${{ github.ref_name }}-latest
-          
+    - name: Debug build context
+      run: |
+        echo "Registry Host: ${{ needs.config.outputs.registry_host }}"
+        echo "Image Repository: ${{ needs.config.outputs.image_repository }}"
+        echo "Service Name: ${{ matrix.service.name }}"
+        echo "Branch Name: ${{ github.ref_name }}"
+        echo "SHA: ${{ github.sha }}"
+        echo "Full image tag with SHA: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
+        echo "Full image tag latest: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-latest"
+        
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: ${{ matrix.service.context }}
         file: ${{ matrix.service.dockerfile }}
         push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        tags: |
+          ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}
+          ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-latest
+        labels: |
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+        cache-from: type=gha,scope=${{ matrix.service.name }}
+        cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
         platforms: linux/amd64
         outputs: type=registry
         

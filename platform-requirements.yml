@@ -45,7 +45,7 @@ app:
 container:
   registry: "docker.io"
   organization: "aryanpola"
-  image: "sample-application"
+  image: "sample-application" #docker repo name
 
 # Section 2.1: Target Environments
 # ---------------------------------------------------------------------
