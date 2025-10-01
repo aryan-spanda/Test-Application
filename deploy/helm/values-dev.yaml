@@ -6,12 +6,12 @@ app:
 # Frontend service configuration (NGINX + React)
 frontend:
   image:
-    tag: "frontend-testing-cf2f285538cb213febbf6c49b1d268232e7ec237" # managed by ArgoCD Image Updater
+    tag: "frontend-testing-6fae73f3e69dc048434330654b6d8b63b846fd8a" # managed by ArgoCD Image Updater
     repository: docker.io/aryanpola/sample-application
 # Backend service configuration (Node.js API)
 backend:
   image:
-    tag: "backend-testing-cf2f285538cb213febbf6c49b1d268232e7ec237" # managed by ArgoCD Image Updater
+    tag: "backend-testing-6fae73f3e69dc048434330654b6d8b63b846fd8a" # managed by ArgoCD Image Updater
     repository: docker.io/aryanpola/sample-application
 image:
   # tag: managed by ArgoCD Image Updater via Helm parameters.
@@ -52,11 +52,7 @@ networkPolicy:
 #   allowFromIngressController: true
 #   allowFromMonitoring: true
 #   allowFromSameNamespace: true  # Allow cross-pod communication for testing
-
 # egress:
-
 #   allowDNS: true
-
 #   allowToInternet: true
-
 #   allowHTTP: true  # Allow HTTP for dev APIs
