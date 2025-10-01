@@ -6,12 +6,12 @@ app:
 # Frontend service configuration (NGINX + React)
 frontend:
   image:
-    tag: "frontend-testing-6fae73f3e69dc048434330654b6d8b63b846fd8a" # managed by ArgoCD Image Updater
+    tag: "frontend-testing-3a9c9cd7a54cffe528c6bfa327c2b1544504897e" # managed by ArgoCD Image Updater
     repository: docker.io/aryanpola/sample-application
 # Backend service configuration (Node.js API)
 backend:
   image:
-    tag: "backend-testing-6fae73f3e69dc048434330654b6d8b63b846fd8a" # managed by ArgoCD Image Updater
+    tag: "backend-testing-3a9c9cd7a54cffe528c6bfa327c2b1544504897e" # managed by ArgoCD Image Updater
     repository: docker.io/aryanpola/sample-application
 image:
   # tag: managed by ArgoCD Image Updater via Helm parameters.
