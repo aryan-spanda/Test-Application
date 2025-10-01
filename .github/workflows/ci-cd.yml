@@ -7,17 +7,17 @@ name: Build and Deploy Microservices
 
 on:
   push:
-    branches: [ testing, develop, staging ]  # Prioritize testing branch
+    branches: [ testing, develop, staging ] # Prioritize testing branch
   pull_request:
-    branches: [ testing ]  # PR target changed to testing
+    branches: [ testing ] # PR target changed to testing
 
 # Add permissions for the GITHUB_TOKEN
 permissions:
-  contents: write          # Allow writing to repository (for updating Helm values)
-  packages: write          # Allow pushing to container registry
-  security-events: write   # Allow uploading security scan results
-  actions: read           # Allow reading workflow artifacts
-  checks: write           # Allow writing check results
+  contents: write # Allow writing to repository (for updating Helm values)
+  packages: write # Allow pushing to container registry
+  security-events: write # Allow uploading security scan results
+  actions: read # Allow reading workflow artifacts
+  checks: write # Allow writing check results
 
 env:
   # Default values - will be overridden by platform-requirements.yml
@@ -46,12 +46,12 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Install yq
       run: |
         sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
         sudo chmod +x /usr/local/bin/yq
-        
+
     - name: Read platform requirements
       id: read-config
       run: |
@@ -67,7 +67,7 @@ jobs:
         registry_username_secret=$(yq e '.cicd.registry_credentials.username_secret // "DOCKERHUB_USERNAME"' $CONFIG_FILE)
         registry_password_secret=$(yq e '.cicd.registry_credentials.password_secret // "DOCKERHUB_TOKEN"' $CONFIG_FILE)
         tagging_format=$(yq e '.cicd.tagging_strategy.format // "{service}-{branch}-{sha}"' $CONFIG_FILE)
-        
+
         echo "app_name=$app_name" >> $GITHUB_OUTPUT
         echo "registry_host=$registry_host" >> $GITHUB_OUTPUT
         echo "image_namespace=$image_namespace" >> $GITHUB_OUTPUT
@@ -78,7 +78,7 @@ jobs:
         echo "registry_username_secret=$registry_username_secret" >> $GITHUB_OUTPUT
         echo "registry_password_secret=$registry_password_secret" >> $GITHUB_OUTPUT
         echo "tagging_format=$tagging_format" >> $GITHUB_OUTPUT
-        
+
         echo "Configuration loaded:"
         echo "  Application: $app_name"
         echo "  Registry: $registry_host"
@@ -89,17 +89,17 @@ jobs:
         echo "  Source Dir: $source_directory"
         echo "  Deployment Branches: $deployment_branches"
         echo "  Tagging Format: $tagging_format"
-        
+
     - name: Check deployment conditions
       id: check-deployment
       run: |
         # Check if current branch should trigger deployment
         current_branch=${GITHUB_REF#refs/heads/}
         deployment_branches='${{ steps.read-config.outputs.deployment_branches }}'
-        
+
         should_deploy="false"
         target_environment="none"
-        
+
         # For testing branch, always deploy to dev environment
         if [[ "$current_branch" == "testing" ]]; then
           should_deploy="true"
@@ -109,7 +109,7 @@ jobs:
           # Get environment mapping
           target_environment=$(yq e ".cicd.environment_mapping.\"$current_branch\" // \"$current_branch\"" $CONFIG_FILE)
         fi
-        
+
         echo "should_deploy=$should_deploy" >> $GITHUB_OUTPUT
         echo "target_environment=$target_environment" >> $GITHUB_OUTPUT
         echo "Branch '$current_branch' -> Deploy: $should_deploy, Environment: $target_environment"
@@ -123,15 +123,15 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Find microservices
       id: find-services
       run: |
         source_dir="${{ needs.config.outputs.source_directory }}"
         echo "Scanning for Dockerfiles in: $source_dir"
-        
+
         services="[]"
-        
+
         # Find all directories with Dockerfiles in the source directory
         for dockerfile in $(find "$source_dir" -name "Dockerfile" -type f); do
           # Get the directory name (service name)
@@ -150,23 +150,155 @@ jobs:
           # Add to services array
           services=$(echo "$services" | jq --argjson service "$service_json" '. + [$service]')
         done
-        
+
         # Compact the JSON to avoid formatting issues with newlines
         services_compact=$(echo "$services" | jq -c .)
-        
+
         # Use delimiter for multiline output
         {
           echo "services<<EOF"
           echo "$services_compact"
           echo "EOF"
         } >> $GITHUB_OUTPUT
-        
+
         echo "Discovered services:"
         echo "$services" | jq .
 
-  # Job 3: Build and push Docker images for each microservice
+  # Job 3: Run tests (COMMENTED OUT - can be re-enabled if needed)
+  # test:
+  #   needs: [config, discover]
+  #   runs-on: ubuntu-latest
+  #   if: needs.discover.outputs.services != '[]'
+  #   strategy:
+  #     matrix:
+  #       service: ${{ fromJson(needs.discover.outputs.services) }}
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
+
+  #   - name: Debug test configuration
+  #     run: |
+  #       echo "Testing service: ${{ matrix.service.name }}"
+  #       echo "Service directory: $(dirname ${{ matrix.service.dockerfile }})"
+  #       echo "Looking for test files in service directory..."
+
+  #   # Frontend/Node.js testing setup
+  #   - name: Set up Node.js for frontend tests
+  #     if: hashFiles(format('{0}/package.json', dirname(matrix.service.dockerfile))) != ''
+  #     uses: actions/setup-node@v4
+  #     with:
+  #       node-version: '18'
+  #       cache: 'npm'
+  #       cache-dependency-path: ${{ dirname(matrix.service.dockerfile) }}/package-lock.json
+
+  #   - name: Install frontend dependencies and run tests
+  #     if: hashFiles(format('{0}/package.json', dirname(matrix.service.dockerfile))) != ''
+  #     run: |
+  #       service_dir=$(dirname "${{ matrix.service.dockerfile }}")
+  #       cd "$service_dir"
+  #       if [ -f "package.json" ]; then
+  #         echo "Installing Node.js dependencies for ${{ matrix.service.name }}..."
+  #         npm ci
+  #         echo "Running frontend tests for ${{ matrix.service.name }}..."
+  #         npm test -- --coverage --watchAll=false || echo "Frontend tests failed but continuing..."
+  #       fi
+
+  #   # Backend/Python testing setup
+  #   - name: Set up Python for backend tests
+  #     if: hashFiles(format('{0}/pyproject.toml', dirname(matrix.service.dockerfile))) != '' || hashFiles(format('{0}/requirements.txt', dirname(matrix.service.dockerfile))) != ''
+  #     uses: actions/setup-python@v4
+  #     with:
+  #       python-version: '3.11'
+
+  #   - name: Install uv for Python projects
+  #     if: hashFiles(format('{0}/pyproject.toml', dirname(matrix.service.dockerfile))) != ''
+  #     uses: astral-sh/setup-uv@v6
+  #     with:
+  #       enable-cache: true
+  #       cache-dependency-glob: "**/uv.lock"
+  #       python-version: '3.11'
+
+  #   - name: Install Python dependencies and run tests
+  #     if: hashFiles(format('{0}/pyproject.toml', dirname(matrix.service.dockerfile))) != '' || hashFiles(format('{0}/requirements.txt', dirname(matrix.service.dockerfile))) != ''
+  #     run: |
+  #       service_dir=$(dirname "${{ matrix.service.dockerfile }}")
+  #       cd "$service_dir"
+  #       
+  #       if [ -f "pyproject.toml" ]; then
+  #         echo "Installing Python dependencies with uv for ${{ matrix.service.name }}..."
+  #         uv sync
+  #         echo "Running backend tests for ${{ matrix.service.name }}..."
+  #         uv run pytest tests/ --maxfail=5 --timeout=60 -v || echo "Backend tests failed but continuing..."
+  #       elif [ -f "requirements.txt" ]; then
+  #         echo "Installing Python dependencies with pip for ${{ matrix.service.name }}..."
+  #         pip install -r requirements.txt
+  #         echo "Running backend tests for ${{ matrix.service.name }}..."
+  #         python -m pytest tests/ --maxfail=5 --timeout=60 -v || echo "Backend tests failed but continuing..."
+  #       fi
+
+  #   # Java/Spring Boot testing setup
+  #   - name: Set up JDK for Java tests
+  #     if: hashFiles(format('{0}/pom.xml', dirname(matrix.service.dockerfile))) != '' || hashFiles(format('{0}/build.gradle', dirname(matrix.service.dockerfile))) != ''
+  #     uses: actions/setup-java@v4
+  #     with:
+  #       java-version: '17'
+  #       distribution: 'temurin'
+
+  #   - name: Run Java tests
+  #     if: hashFiles(format('{0}/pom.xml', dirname(matrix.service.dockerfile))) != '' || hashFiles(format('{0}/build.gradle', dirname(matrix.service.dockerfile))) != ''
+  #     run: |
+  #       service_dir=$(dirname "${{ matrix.service.dockerfile }}")
+  #       cd "$service_dir"
+  #       
+  #       if [ -f "pom.xml" ]; then
+  #         echo "Running Maven tests for ${{ matrix.service.name }}..."
+  #         ./mvnw test -B --no-transfer-progress || echo "Maven tests failed but continuing..."
+  #       elif [ -f "build.gradle" ]; then
+  #         echo "Running Gradle tests for ${{ matrix.service.name }}..."
+  #         ./gradlew test --no-daemon || echo "Gradle tests failed but continuing..."
+  #       fi
+
+  #   # Generic test runner for other languages
+  #   - name: Run generic tests
+  #     run: |
+  #       service_dir=$(dirname "${{ matrix.service.dockerfile }}")
+  #       cd "$service_dir"
+  #       
+  #       # Look for common test directories and files
+  #       if [ -d "tests" ] || [ -d "test" ] || [ -f "Makefile" ]; then
+  #         echo "Found test directory or Makefile for ${{ matrix.service.name }}"
+  #         
+  #         # Try common test commands
+  #         if [ -f "Makefile" ] && grep -q "test" Makefile; then
+  #           echo "Running make test..."
+  #           make test || echo "Make test failed but continuing..."
+  #         elif [ -f "test.sh" ]; then
+  #           echo "Running test.sh..."
+  #           chmod +x test.sh && ./test.sh || echo "test.sh failed but continuing..."
+  #         else
+  #           echo "No standard test command found for ${{ matrix.service.name }}"
+  #         fi
+  #       else
+  #         echo "No tests directory found for ${{ matrix.service.name }}, skipping tests"
+  #       fi
+
+  #   - name: Upload test results
+  #     if: always()
+  #     uses: actions/upload-artifact@v4
+  #     with:
+  #       name: test-results-${{ matrix.service.name }}
+  #       path: |
+  #         $(dirname ${{ matrix.service.dockerfile }})/coverage/
+  #         $(dirname ${{ matrix.service.dockerfile }})/test-results/
+  #         $(dirname ${{ matrix.service.dockerfile }})/target/surefire-reports/
+  #         $(dirname ${{ matrix.service.dockerfile }})/build/test-results/
+  #       if-no-files-found: ignore
+
+  # Job 4: Build and push Docker images for each microservice
   build:
-    needs: [config, discover]
+    needs: [ config, discover ]
+    # Uncomment the line below if you enable the test job
+    # needs: [config, discover, test]
     runs-on: ubuntu-latest
     if: needs.discover.outputs.services != '[]'
     strategy:
@@ -184,13 +316,13 @@ jobs:
         echo "  - ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
         echo "  - ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-latest"
         echo "Services JSON: ${{ needs.discover.outputs.services }}"
-        
+
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-      
+
     - name: Debug registry configuration
       run: |
         echo "Registry host: ${{ needs.config.outputs.registry_host }}"
@@ -200,20 +332,20 @@ jobs:
         echo "Full repository: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}"
         echo "Username secret name: ${{ needs.config.outputs.registry_username_secret }}"
         echo "Password secret name: ${{ needs.config.outputs.registry_password_secret }}"
-        
+
     - name: Log in to container registry
       uses: docker/login-action@v3
       with:
         registry: ${{ needs.config.outputs.registry_host }}
         username: ${{ secrets[needs.config.outputs.registry_username_secret] }}
         password: ${{ secrets[needs.config.outputs.registry_password_secret] }}
-        
+
     - name: Verify Docker login
       run: |
         echo "Testing Docker Hub connection..."
         docker info
         docker version
-        
+
     - name: Debug build context
       run: |
         echo "Application: ${{ needs.config.outputs.app_name }}"
@@ -224,7 +356,7 @@ jobs:
         echo "SHA: ${{ github.sha }}"
         echo "Full image tag with SHA: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
         echo "Full image tag latest: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-latest"
-        
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
@@ -242,23 +374,23 @@ jobs:
         cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
         platforms: linux/amd64
         outputs: type=registry
-        
+
     - name: Debug build outputs
       run: |
         echo "Build completed for application: ${{ needs.config.outputs.app_name }}"
         echo "Service: ${{ matrix.service.name }}"
         echo "Expected image: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}"
         echo "Service-specific tags: ${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}, ${{ matrix.service.name }}-${{ github.ref_name }}-latest"
-        
+
     - name: Output image details
       run: |
         echo "Built and pushed image for service: ${{ matrix.service.name }}"
         echo "Image tags: ${{ steps.meta.outputs.tags }}"
         echo "Image digest: ${{ steps.meta.outputs.digest }}"
 
-  # Job 4: Security scanning
+  # Job 5: Security scanning
   security:
-    needs: [config, discover, build]
+    needs: [ config, discover, build ]
     runs-on: ubuntu-latest
     if: needs.discover.outputs.services != '[]'
     strategy:
@@ -267,19 +399,19 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Wait for image to be available
       run: |
         echo "Waiting 30 seconds for image to be available on DockerHub..."
         sleep 30
-        
+
     - name: Verify image exists before scanning
       id: check-image
       continue-on-error: true
       run: |
         image_name="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
         echo "Checking if image exists: $image_name"
-        
+
         # Try to pull the image manifest to verify it exists
         if docker manifest inspect "$image_name" > /dev/null 2>&1; then
           echo "image_exists=true" >> $GITHUB_OUTPUT
@@ -288,7 +420,7 @@ jobs:
           echo "image_exists=false" >> $GITHUB_OUTPUT
           echo "❌ Image not found: $image_name"
         fi
-        
+
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       if: steps.check-image.outputs.image_exists == 'true'
@@ -297,9 +429,9 @@ jobs:
         image-ref: ${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}
         format: 'sarif'
         output: 'trivy-results-${{ matrix.service.name }}.sarif'
-        timeout: '10m'  # Increase timeout to 10 minutes
-        scanners: 'vuln'  # Only scan for vulnerabilities, skip secrets to speed up
-        
+        timeout: '10m' # Increase timeout to 10 minutes
+        scanners: 'vuln' # Only scan for vulnerabilities, skip secrets to speed up
+
     - name: Fallback Quick Trivy scan
       if: ${{ steps.check-image.outputs.image_exists == 'true' && failure() }}
       continue-on-error: true
@@ -307,7 +439,7 @@ jobs:
         echo "Full scan failed, attempting quick vulnerability-only scan..."
         IMAGE_NAME="${{ needs.config.outputs.registry_host }}/${{ needs.config.outputs.image_repository }}:${{ matrix.service.name }}-${{ github.ref_name }}-${{ github.sha }}"
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --timeout 5m --scanners vuln --severity HIGH,CRITICAL "$IMAGE_NAME" || echo "Quick scan also failed"
-        
+
     - name: Check if SARIF file was created
       id: check-sarif
       run: |
@@ -318,16 +450,16 @@ jobs:
           echo "sarif_exists=false" >> $GITHUB_OUTPUT
           echo "❌ SARIF file not found (scan may have failed or timed out)"
         fi
-        
+
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
       if: steps.check-sarif.outputs.sarif_exists == 'true'
       with:
         sarif_file: 'trivy-results-${{ matrix.service.name }}.sarif'
 
-  # Job 5: Update Helm values for ArgoCD Image Updater (Testing Branch Integration)
+  # Job 6: Update Helm values for ArgoCD Image Updater (Testing Branch Integration)
   update-helm-values:
-    needs: [config, discover, build, security]
+    needs: [ config, discover, build, security ]
     runs-on: ubuntu-latest
     if: needs.config.outputs.should_deploy == 'true' && github.ref_name == 'testing'
     steps:
@@ -335,16 +467,16 @@ jobs:
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        
+
     - name: Install yq
       run: |
         sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
         sudo chmod +x /usr/local/bin/yq
-        
+
     - name: Update Helm values for testing environment
       run: |
         echo "🔄 Updating Helm values for testing branch deployment..."
-        
+
         # Check if Helm values file exists
         HELM_VALUES_FILE="deploy/helm/values-dev.yaml"
         if [[ ! -f "$HELM_VALUES_FILE" ]]; then
@@ -352,7 +484,7 @@ jobs:
           mkdir -p deploy/helm
           echo "# Auto-generated values for testing branch" > "$HELM_VALUES_FILE"
         fi
-        
+
         # Update image tags for each discovered service
         echo '${{ needs.discover.outputs.services }}' | jq -r '.[].name' | while read service; do
           echo "Updating $service image tag..."
@@ -367,12 +499,12 @@ jobs:
           
           echo "Updated $service -> $image_repo:$image_tag"
         done
-        
+
     - name: Commit updated Helm values
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        
+
         if git diff --quiet deploy/helm/values-dev.yaml; then
           echo "No changes to commit"
         else
@@ -389,9 +521,9 @@ jobs:
   # 3. Commit changes to repository
   # 4. Trigger ArgoCD sync
 
-  # Job 6: Notification and summary
+  # Job 7: Notification and summary
   notify:
-    needs: [config, discover, build, security, update-helm-values]
+    needs: [ config, discover, build, security, update-helm-values ]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -399,23 +531,23 @@ jobs:
       run: |
         echo "## 🤖 Educational Chatbot CI/CD Summary (Testing Branch)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         echo "### ✅ Build & Push Status" >> $GITHUB_STEP_SUMMARY
         echo "- **Branch**: ${{ github.ref_name }} (Testing Branch Optimized)" >> $GITHUB_STEP_SUMMARY
         echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- **Images**: Built and pushed to Docker registry" >> $GITHUB_STEP_SUMMARY
         echo "- **Deployment**: ArgoCD Image Updater will auto-detect and deploy" >> $GITHUB_STEP_SUMMARY
         echo "- **Environment**: ${{ needs.config.outputs.target_environment }}" >> $GITHUB_STEP_SUMMARY
-        
+
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 🔨 Built Services" >> $GITHUB_STEP_SUMMARY
-        
+
         if [ "${{ needs.discover.outputs.services }}" != "[]" ]; then
           echo '${{ needs.discover.outputs.services }}' | jq -r '.[] | "- **" + .name + "** (from `" + .dockerfile + "`)"' >> $GITHUB_STEP_SUMMARY
         else
           echo "No services found to build." >> $GITHUB_STEP_SUMMARY
         fi
-        
+
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 📊 Job Status" >> $GITHUB_STEP_SUMMARY
         echo "- **Config**: ${{ needs.config.result }}" >> $GITHUB_STEP_SUMMARY
@@ -423,14 +555,14 @@ jobs:
         echo "- **Build**: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Security**: ${{ needs.security.result }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Helm Update**: ${{ needs.update-helm-values.result }}" >> $GITHUB_STEP_SUMMARY
-        
+
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 🎯 Testing Branch Features" >> $GITHUB_STEP_SUMMARY
         echo "- **SHA-based tags**: Images tagged with \`service-testing-sha\` format" >> $GITHUB_STEP_SUMMARY
         echo "- **Auto Helm update**: Values files updated automatically for testing branch" >> $GITHUB_STEP_SUMMARY
         echo "- **ArgoCD Integration**: Optimized for ArgoCD Image Updater detection" >> $GITHUB_STEP_SUMMARY
         echo "- **Security scanning**: Trivy vulnerability scanning included" >> $GITHUB_STEP_SUMMARY
-        
+
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 🚀 Next Steps" >> $GITHUB_STEP_SUMMARY
         echo "ArgoCD Image Updater will automatically:" >> $GITHUB_STEP_SUMMARY
